@@ -34,9 +34,13 @@ bin/
 # Runtime audit logs
 logs/
 
-# Dependencies downloaded by setup-dependencies.ps1
+# Full JavaFX downloads are local-only. The small, required offline runtime
+# under lib/javafx-runtime-26.0.2 is intentionally committed.
 /lib/javafx-sdk-*/
 /lib/openjfx-*.zip
+!/lib/javafx-runtime-26.0.2/
+!/lib/javafx-runtime-26.0.2/bin/
+!/lib/javafx-runtime-26.0.2/bin/*.dll
 
 # Quantis SDK binaries are installed locally from the licensed vendor package
 /lib/quantis/*.jar

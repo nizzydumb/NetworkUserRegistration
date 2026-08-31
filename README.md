@@ -6,8 +6,9 @@
 - JDK 26 available on `PATH`
 - PowerShell
 
-JavaFX 26.0.2 is downloaded from Gluon automatically on the first build and cached under `lib`. Downloaded JavaFX
-files, IntelliJ settings, build output, logs, and proprietary Quantis binaries are intentionally excluded from Git.
+The repository contains a reduced Windows x64 JavaFX 26.0.2 runtime with the `base`, `graphics`, and `controls`
+modules required by this application. No network connection is required to build or run it. Full JavaFX SDK
+downloads, IntelliJ settings, build output, logs, and proprietary Quantis binaries are excluded from Git.
 
 ## Build and run
 
@@ -16,7 +17,7 @@ files, IntelliJ settings, build output, logs, and proprietary Quantis binaries a
 .\run.ps1
 ```
 
-The first build requires internet access. Later builds use the local JavaFX cache.
+Both commands work offline after cloning or unpacking the repository, provided JDK 26 is installed locally.
 
 ## Quantis
 

@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$javaFxLib = Join-Path $projectRoot "lib\javafx-sdk-26.0.2\lib"
+$javaFxLib = Join-Path $projectRoot "lib\javafx-runtime-26.0.2\lib"
 $outputDir = Join-Path $projectRoot "out\production\NetworkUserRegistration"
 $quantisLib = Join-Path $projectRoot "lib\quantis"
 
