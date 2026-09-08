@@ -2,19 +2,36 @@ $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $javaFxVersion = "26.0.2"
-$javaFxDirectory = Join-Path $projectRoot "lib\javafx-runtime-$javaFxVersion"
+$javaFxDirectory = Join-Path $projectRoot "lib\javafx-sdk-$javaFxVersion"
+$jdkDirectory = Join-Path $projectRoot "lib\jdk-26.0.2"
 $requiredFiles = @(
     "lib\javafx.base.jar",
     "lib\javafx.graphics.jar",
     "lib\javafx.controls.jar",
+    "lib\javafx.fxml.jar",
+    "lib\javafx.media.jar",
+    "lib\javafx.swing.jar",
+    "lib\javafx.web.jar",
+    "lib\jdk.jsobject.jar",
+    "src.zip",
     "bin\glass.dll",
     "bin\javafx_font.dll",
-    "bin\prism_d3d.dll"
+    "bin\prism_d3d.dll",
+    "bin\jfxmedia.dll",
+    "bin\jfxwebkit.dll"
 )
 
 $missingFiles = @($requiredFiles | Where-Object {
     -not (Test-Path (Join-Path $javaFxDirectory $_))
 })
 if ($missingFiles.Count -gt 0) {
-    throw "The repository's offline JavaFX bundle is incomplete. Missing: $($missingFiles -join ', ')"
+    throw "The repository's offline JavaFX SDK is incomplete. Missing: $($missingFiles -join ', ')"
+}
+
+$requiredJdkFiles = @("bin\java.exe", "bin\javac.exe", "lib\modules", "release")
+$missingJdkFiles = @($requiredJdkFiles | Where-Object {
+    -not (Test-Path (Join-Path $jdkDirectory $_))
+})
+if ($missingJdkFiles.Count -gt 0) {
+    throw "The repository's offline OpenJDK is incomplete. Missing: $($missingJdkFiles -join ', ')"
 }

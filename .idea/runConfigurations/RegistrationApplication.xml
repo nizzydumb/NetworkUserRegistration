@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="RegistrationApplication" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="app.RegistrationApplication" />
+    <module name="NetworkUserRegistration" />
+    <option name="VM_PARAMETERS" value="--module-path &quot;$PROJECT_DIR$/lib/javafx-sdk-26.0.2/lib&quot; --add-modules javafx.controls --enable-native-access=javafx.graphics,ALL-UNNAMED -Djava.library.path=&quot;$PROJECT_DIR$/lib/quantis&quot;" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

@@ -1,6 +1,13 @@
 ### IntelliJ IDEA ###
-.idea/
+.idea/*
+!/.idea/.gitignore
+!/.idea/compiler.xml
+!/.idea/misc.xml
+!/.idea/modules.xml
+!/.idea/runConfigurations/
+!/.idea/runConfigurations/RegistrationApplication.xml
 *.iml
+!/NetworkUserRegistration.iml
 out/
 !**/src/main/**/out/
 !**/src/test/**/out/
@@ -34,13 +41,19 @@ bin/
 # Runtime audit logs
 logs/
 
-# Full JavaFX downloads are local-only. The small, required offline runtime
-# under lib/javafx-runtime-26.0.2 is intentionally committed.
-/lib/javafx-sdk-*/
+# The extracted JavaFX SDK is intentionally committed for offline development.
+# Its redundant download archive stays local-only.
 /lib/openjfx-*.zip
-!/lib/javafx-runtime-26.0.2/
-!/lib/javafx-runtime-26.0.2/bin/
-!/lib/javafx-runtime-26.0.2/bin/*.dll
+!/lib/javafx-sdk-26.0.2/
+!/lib/javafx-sdk-26.0.2/bin/
+!/lib/javafx-sdk-26.0.2/bin/*.dll
+
+# The complete OpenJDK is committed so the project can be configured offline.
+# Generic IDE ignore rules above would otherwise hide its bin directory.
+!/lib/jdk-26.0.2/
+!/lib/jdk-26.0.2/bin/
+!/lib/jdk-26.0.2/bin/**
+/lib/openjdk-26.0.2_windows-x64_bin.zip
 
 # Quantis SDK binaries are installed locally from the licensed vendor package
 /lib/quantis/*.jar

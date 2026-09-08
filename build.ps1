@@ -1,7 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$javaFxLib = Join-Path $projectRoot "lib\javafx-runtime-26.0.2\lib"
+$javaFxLib = Join-Path $projectRoot "lib\javafx-sdk-26.0.2\lib"
+$javaCompiler = Join-Path $projectRoot "lib\jdk-26.0.2\bin\javac.exe"
 $outputDir = Join-Path $projectRoot "out\production\NetworkUserRegistration"
 $sourceRoot = Join-Path $projectRoot "src"
 & (Join-Path $projectRoot "setup-dependencies.ps1")
@@ -22,7 +23,7 @@ $compilerArgs = @(
 )
 $compilerArgs += $sourceFiles
 
-javac @compilerArgs
+& $javaCompiler @compilerArgs
 
 foreach ($resource in $resourceFiles) {
     $relativePath = $resource.FullName.Substring($sourceRoot.Length + 1)
