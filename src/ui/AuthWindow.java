@@ -2,6 +2,7 @@ package ui;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.beans.binding.Bindings;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -131,6 +132,12 @@ public class AuthWindow {
         Button loginButton = new Button("Login");
         loginButton.getStyleClass().add("primary-button");
         loginButton.setMinWidth(150);
+        loginButton.setDefaultButton(true);
+        loginButton.disableProperty().bind(Bindings.createBooleanBinding(
+                () -> usernameField.getText().isBlank() || passwordField.getText().isBlank(),
+                usernameField.textProperty(),
+                passwordField.textProperty()
+        ));
 
         Button cancelButton = new Button("Cancel");
         cancelButton.getStyleClass().add("secondary-button");

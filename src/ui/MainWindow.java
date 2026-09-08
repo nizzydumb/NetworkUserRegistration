@@ -2,6 +2,9 @@ package ui;
 
 import javafx.animation.PauseTransition;
 import javafx.animation.SequentialTransition;
+import javafx.beans.Observable;
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.BooleanBinding;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -518,6 +521,7 @@ public class MainWindow {
         dialog.getDialogPane().setContent(form);
 
         Button okButton = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);
+        bindRequiredFields(dialog, okButton, nameField, descriptionField, addressRangeField);
         okButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
             event.consume();
             NetworkFormData formData = new NetworkFormData(
@@ -562,22 +566,20 @@ public class MainWindow {
         form.addRow(4, new Label("Location"), locationField);
         dialog.getDialogPane().setContent(form);
 
+        Button okButton = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);
+        bindRequiredFields(dialog, okButton, nameField, descriptionField, addressRangeField);
+
         dialog.setResultConverter(button -> {
             if (button != ButtonType.OK) {
                 return null;
             }
-            try {
-                return service.updateNetwork(
-                        selectedNetwork,
-                        nameField.getText(),
-                        descriptionField.getText(),
-                        addressRangeField.getText(),
-                        locationField.getText()
-                );
-            } catch (IllegalArgumentException exception) {
-                showValidationError(exception.getMessage());
-                return null;
-            }
+            return service.updateNetwork(
+                    selectedNetwork,
+                    nameField.getText(),
+                    descriptionField.getText(),
+                    addressRangeField.getText(),
+                    locationField.getText()
+            );
         });
 
         dialog.showAndWait().ifPresent(updatedNetwork -> {
@@ -621,6 +623,7 @@ public class MainWindow {
         dialog.getDialogPane().setContent(form);
 
         Button okButton = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);
+        bindRequiredFields(dialog, okButton, descriptionField, fullNameField, loginField);
         okButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
             event.consume();
             UserFormData formData = new UserFormData(
@@ -677,23 +680,21 @@ public class MainWindow {
         form.addRow(6, new Label("Role"), roleField);
         dialog.getDialogPane().setContent(form);
 
+        Button okButton = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK);
+        bindRequiredFields(dialog, okButton, descriptionField, fullNameField, loginField);
+
         dialog.setResultConverter(button -> {
             if (button != ButtonType.OK) {
                 return null;
             }
-            try {
-                return service.updateUser(
-                        selectedUser,
-                        descriptionField.getText(),
-                        fullNameField.getText(),
-                        loginField.getText(),
-                        ipAddressField.getText(),
-                        roleField.getText()
-                );
-            } catch (IllegalArgumentException exception) {
-                showValidationError(exception.getMessage());
-                return null;
-            }
+            return service.updateUser(
+                    selectedUser,
+                    descriptionField.getText(),
+                    fullNameField.getText(),
+                    loginField.getText(),
+                    ipAddressField.getText(),
+                    roleField.getText()
+            );
         });
 
         dialog.showAndWait().ifPresent(user -> {
@@ -758,6 +759,28 @@ public class MainWindow {
         return field;
     }
 
+    private void bindRequiredFields(Dialog<?> dialog, Button submitButton, TextField... requiredFields) {
+        Observable[] dependencies = new Observable[requiredFields.length];
+        for (int index = 0; index < requiredFields.length; index++) {
+            dependencies[index] = requiredFields[index].textProperty();
+        }
+
+        BooleanBinding invalid = Bindings.createBooleanBinding(
+                () -> {
+                    for (TextField field : requiredFields) {
+                        if (field.getText() == null || field.getText().isBlank()) {
+                            return true;
+                        }
+                    }
+                    return false;
+                },
+                dependencies
+        );
+        submitButton.disableProperty().bind(
+                invalid.or(dialog.getDialogPane().getContent().disableProperty())
+        );
+    }
+
     private <T> void runDialogButtonTask(Dialog<?> dialog, Button okButton, String loadingText, Supplier<T> action, Consumer<T> onSuccess) {
         DialogPane dialogPane = dialog.getDialogPane();
         Button cancelButton = (Button) dialogPane.lookupButton(ButtonType.CANCEL);
@@ -776,7 +799,6 @@ public class MainWindow {
         okButton.setMinWidth(150);
         okButton.setPrefWidth(150);
         okButton.getStyleClass().add("loading-button");
-        okButton.setDisable(true);
         cancelButton.setDisable(true);
 
         Task<T> task = new Task<>() {
@@ -794,10 +816,9 @@ public class MainWindow {
             okButton.setText(originalText);
             okButton.setGraphic(originalGraphic);
             okButton.getStyleClass().remove("loading-button");
-            okButton.setDisable(false);
             cancelButton.setDisable(false);
             Throwable exception = task.getException();
-            showValidationError(exception == null ? "Operation failed." : exception.getMessage());
+            showOperationError(exception == null ? "Operation failed." : exception.getMessage());
         });
 
         Thread worker = new Thread(task, "registration-sync-worker");
@@ -814,9 +835,9 @@ public class MainWindow {
         }
     }
 
-    private void showValidationError(String message) {
-        Alert alert = new Alert(Alert.AlertType.WARNING, message, ButtonType.OK);
-        alert.setHeaderText("Check the form");
+    private void showOperationError(String message) {
+        Alert alert = new Alert(Alert.AlertType.ERROR, message, ButtonType.OK);
+        alert.setHeaderText("Operation failed");
         alert.showAndWait();
     }
 
