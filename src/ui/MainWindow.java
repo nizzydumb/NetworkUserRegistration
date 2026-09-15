@@ -15,6 +15,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.DialogPane;
@@ -36,6 +37,7 @@ import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
@@ -45,9 +47,14 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 import model.Network;
 import model.NetworkUser;
+import logging.AppLogger;
 import service.RegistrationService;
+import storage.JnaPhysicalDriveService;
+import storage.PhysicalDriveInfo;
+import storage.RawByteWriteRequest;
 
 import java.net.URL;
+import java.util.HexFormat;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -116,11 +123,234 @@ public class MainWindow {
 
         VBox text = new VBox(2, title, subtitle);
 
-        HBox header = new HBox(text);
+        Label physicalDriveLabel = new Label("PHYSICAL DRIVE");
+        physicalDriveLabel.getStyleClass().add("drive-selector-label");
+        ComboBox<PhysicalDriveInfo> physicalDriveBox = new ComboBox<>();
+        physicalDriveBox.setPromptText("No physical drives detected");
+        physicalDriveBox.setPrefWidth(350);
+        physicalDriveBox.setMaxWidth(350);
+        physicalDriveBox.getStyleClass().add("drive-selector");
+        physicalDriveBox.setCellFactory(list -> createPhysicalDriveCell(false));
+        physicalDriveBox.setButtonCell(createPhysicalDriveCell(true));
+        loadPhysicalDrives(physicalDriveBox);
+        VBox driveSelector = new VBox(5, physicalDriveLabel, physicalDriveBox);
+        driveSelector.getStyleClass().add("drive-selector-group");
+        driveSelector.setAlignment(Pos.CENTER_RIGHT);
+        physicalDriveLabel.setMaxWidth(Double.MAX_VALUE);
+        physicalDriveLabel.setAlignment(Pos.CENTER_RIGHT);
+
+        HBox header = new HBox(18, text, driveSelector);
+        HBox.setHgrow(text, Priority.ALWAYS);
         header.setPadding(new Insets(18, 22, 16, 22));
         header.setAlignment(Pos.CENTER_LEFT);
         header.getStyleClass().add("app-header");
         return header;
+    }
+
+    private void loadPhysicalDrives(ComboBox<PhysicalDriveInfo> driveBox) {
+        try {
+            driveBox.getItems().setAll(new JnaPhysicalDriveService().listPhysicalDrives());
+            if (!driveBox.getItems().isEmpty()) driveBox.getSelectionModel().selectFirst();
+        } catch (Throwable exception) {
+            driveBox.setPromptText("Drive scan failed - see application.log");
+            AppLogger.error("Physical drive inventory failed", exception);
+        }
+    }
+
+    private ListCell<PhysicalDriveInfo> createPhysicalDriveCell(boolean compact) {
+        return new ListCell<>() {
+            @Override
+            protected void updateItem(PhysicalDriveInfo drive, boolean empty) {
+                super.updateItem(drive, empty);
+                if (!getStyleClass().contains("drive-cell")) getStyleClass().add("drive-cell");
+                if (empty || drive == null) {
+                    setText(null);
+                    setGraphic(null);
+                    return;
+                }
+
+                Circle stateDot = new Circle(4);
+                stateDot.getStyleClass().add(drive.systemDisk() ? "drive-dot-system"
+                        : (drive.offline() ? "drive-dot-offline" : "drive-dot-online"));
+
+                Label diskName = new Label("Disk " + drive.number());
+                diskName.getStyleClass().add("drive-disk-number");
+                diskName.setMinWidth(58);
+                diskName.setPrefWidth(58);
+
+                if (compact) {
+                    Label summary = new Label(drive.sizeLabel() + "  ·  " + drive.model());
+                    summary.getStyleClass().add("drive-summary");
+                    summary.setMaxWidth(Double.MAX_VALUE);
+                    HBox.setHgrow(summary, Priority.ALWAYS);
+                    HBox content = new HBox(9, stateDot, diskName, summary);
+                    content.setAlignment(Pos.CENTER_LEFT);
+                    content.setMinWidth(0);
+                    setText(null);
+                    setGraphic(content);
+                    return;
+                }
+
+                Label name = new Label(drive.model());
+                name.getStyleClass().add("drive-name");
+                name.setMaxWidth(Double.MAX_VALUE);
+
+                Label details = new Label(drive.devicePath() + "  ·  " + drive.sizeLabel());
+                details.getStyleClass().add("drive-details");
+
+                String statusText = drive.systemDisk() ? "SYSTEM" : (drive.offline() ? "OFFLINE" : "ONLINE");
+                Label status = new Label(statusText);
+                status.getStyleClass().addAll("drive-status",
+                        drive.systemDisk() ? "drive-status-system"
+                                : (drive.offline() ? "drive-status-offline" : "drive-status-online"));
+
+                HBox titleRow = new HBox(8, stateDot, diskName, name);
+                titleRow.setAlignment(Pos.CENTER_LEFT);
+                HBox.setHgrow(name, Priority.ALWAYS);
+                HBox detailRow = new HBox(8, details, status);
+                detailRow.setAlignment(Pos.CENTER_LEFT);
+                HBox.setHgrow(details, Priority.ALWAYS);
+                VBox content = new VBox(3, titleRow, detailRow);
+                content.setMinWidth(0);
+                setText(null);
+                setGraphic(content);
+            }
+        };
+    }
+
+    private void showRawDriveDialog(Stage owner) {
+        JnaPhysicalDriveService driveService;
+        try {
+            driveService = new JnaPhysicalDriveService();
+        } catch (Throwable exception) {
+            AppLogger.error("Could not load native raw-drive library", exception);
+            showOperationError("Could not load lib/native/rawdrive/rawdrive.dll: " + exception.getMessage());
+            return;
+        }
+
+        ComboBox<PhysicalDriveInfo> driveBox = new ComboBox<>();
+        driveBox.setMaxWidth(Double.MAX_VALUE);
+        TextField offsetField = new TextField("0");
+        offsetField.setPromptText("Byte offset (decimal or 0x hexadecimal)");
+        TextField bytesField = new TextField("DE AD BE EF");
+        bytesField.setPromptText("Hex bytes, for example DE AD BE EF");
+        Button refreshButton = new Button("Refresh drives");
+        refreshButton.getStyleClass().add("secondary-button");
+        Label elevation = new Label(driveService.isElevated()
+                ? "Administrator: yes" : "Administrator: no — restart IntelliJ as Administrator");
+        Label policy = new Label("All disks are listed. Writes require an offline, non-system disk and read-back verification.");
+        policy.setWrapText(true);
+
+        ButtonType writeType = new ButtonType("Write and verify", javafx.scene.control.ButtonBar.ButtonData.OK_DONE);
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Physical Drive Byte Writer");
+        dialog.initOwner(owner);
+        dialog.initModality(Modality.WINDOW_MODAL);
+        dialog.getDialogPane().getButtonTypes().addAll(writeType, ButtonType.CANCEL);
+        GridPane form = createFormGrid();
+        form.addRow(0, new Label("Physical drive"), driveBox);
+        form.addRow(1, new Label("Byte offset"), offsetField);
+        form.addRow(2, new Label("Bytes (hex)"), bytesField);
+        form.addRow(3, new Label("Elevation"), elevation);
+        form.add(refreshButton, 1, 4);
+        form.add(policy, 0, 5, 2, 1);
+        dialog.getDialogPane().setContent(form);
+        URL stylesheet = MainWindow.class.getResource("app.css");
+        if (stylesheet != null) dialog.getDialogPane().getStylesheets().add(stylesheet.toExternalForm());
+
+        try {
+            driveBox.getItems().setAll(driveService.listPhysicalDrives());
+            if (!driveBox.getItems().isEmpty()) driveBox.getSelectionModel().selectFirst();
+        } catch (RuntimeException exception) {
+            AppLogger.error("Physical drive inventory failed", exception);
+            showOperationError(exception.getMessage());
+        }
+        refreshButton.setOnAction(event -> {
+            Integer selectedNumber = driveBox.getValue() == null ? null : driveBox.getValue().number();
+            try {
+                driveBox.getItems().setAll(driveService.listPhysicalDrives());
+                if (selectedNumber != null) {
+                    driveBox.getItems().stream().filter(drive -> drive.number() == selectedNumber)
+                            .findFirst().ifPresent(driveBox.getSelectionModel()::select);
+                }
+                if (driveBox.getValue() == null && !driveBox.getItems().isEmpty())
+                    driveBox.getSelectionModel().selectFirst();
+            } catch (RuntimeException exception) {
+                AppLogger.error("Physical drive inventory refresh failed", exception);
+                showOperationError(exception.getMessage());
+            }
+        });
+
+        Button writeButton = (Button) dialog.getDialogPane().lookupButton(writeType);
+        BooleanBinding invalid = Bindings.createBooleanBinding(() -> {
+            PhysicalDriveInfo drive = driveBox.getValue();
+            return !driveService.isElevated() || drive == null || !drive.writableByPolicy()
+                    || !validOffset(offsetField.getText()) || !validHexBytes(bytesField.getText());
+        }, driveBox.valueProperty(), offsetField.textProperty(), bytesField.textProperty());
+        writeButton.disableProperty().bind(invalid);
+        writeButton.getStyleClass().add("danger-button");
+        writeButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+            event.consume();
+            PhysicalDriveInfo drive = driveBox.getValue();
+            long offset = parseOffset(offsetField.getText());
+            byte[] bytes = parseHexBytes(bytesField.getText());
+            if (!confirmPhysicalWrite(owner, drive, offset, bytes.length)) return;
+            try {
+                driveService.writePhysical(new RawByteWriteRequest(drive.number(), offset, bytes));
+                AppLogger.info("Physical drive write verified: drive=" + drive.number()
+                        + ", offset=" + offset + ", length=" + bytes.length);
+                dialog.close();
+                Alert success = new Alert(Alert.AlertType.INFORMATION,
+                        "The bytes were written and verified by reading them back.", ButtonType.OK);
+                success.setHeaderText("Physical drive write verified");
+                success.initOwner(owner);
+                success.showAndWait();
+            } catch (RuntimeException exception) {
+                AppLogger.error("Physical drive write failed: drive=" + drive.number(), exception);
+                showOperationError(exception.getMessage());
+            }
+        });
+        dialog.showAndWait();
+    }
+
+    private boolean confirmPhysicalWrite(Stage owner, PhysicalDriveInfo drive, long offset, int length) {
+        String token = "WRITE PHYSICALDRIVE" + drive.number();
+        TextField confirmation = new TextField();
+        confirmation.setPromptText(token);
+        Label warning = new Label("This permanently overwrites " + length + " byte(s) at offset " + offset
+                + " on " + drive.devicePath() + ". Type “" + token + "” to continue.");
+        warning.setWrapText(true);
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Confirm permanent raw-disk write");
+        dialog.initOwner(owner);
+        ButtonType confirmType = new ButtonType("Permanently write", javafx.scene.control.ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(confirmType, ButtonType.CANCEL);
+        dialog.getDialogPane().setContent(new VBox(10, warning, confirmation));
+        Button confirm = (Button) dialog.getDialogPane().lookupButton(confirmType);
+        confirm.getStyleClass().add("danger-button");
+        confirm.disableProperty().bind(confirmation.textProperty().isNotEqualTo(token));
+        return dialog.showAndWait().orElse(ButtonType.CANCEL) == confirmType;
+    }
+
+    private boolean validOffset(String text) {
+        try { return parseOffset(text) >= 0; } catch (RuntimeException exception) { return false; }
+    }
+
+    private long parseOffset(String text) {
+        String value = text == null ? "" : text.strip();
+        return value.startsWith("0x") || value.startsWith("0X")
+                ? Long.parseUnsignedLong(value.substring(2), 16) : Long.parseLong(value);
+    }
+
+    private boolean validHexBytes(String text) {
+        try { return parseHexBytes(text).length <= JnaPhysicalDriveService.MAX_WRITE_BYTES; }
+        catch (RuntimeException exception) { return false; }
+    }
+
+    private byte[] parseHexBytes(String text) {
+        String normalized = text == null ? "" : text.replaceAll("(?i)0x", "").replaceAll("[\\s,;:_-]", "");
+        if (normalized.isEmpty() || (normalized.length() & 1) != 0) throw new IllegalArgumentException("Invalid hex bytes.");
+        return HexFormat.of().parseHex(normalized);
     }
 
     private SplitPane createBody(Stage owner) {
@@ -202,6 +432,7 @@ public class MainWindow {
                 description.getStyleClass().add("row-description");
 
                 VBox text = new VBox(3, name, description);
+                text.setMinWidth(0);
                 HBox.setHgrow(text, Priority.ALWAYS);
 
                 Button editButton = createEditIconButton();
@@ -225,8 +456,9 @@ public class MainWindow {
 
                 HBox row = new HBox(12, text, rowActions);
                 row.setAlignment(Pos.CENTER_LEFT);
+                row.setMinWidth(0);
                 row.setMaxWidth(Double.MAX_VALUE);
-                row.prefWidthProperty().bind(networkList.widthProperty().subtract(34));
+                row.prefWidthProperty().bind(networkList.widthProperty().subtract(58));
                 row.getStyleClass().add("network-row-content");
 
                 setText(null);
@@ -836,8 +1068,42 @@ public class MainWindow {
     }
 
     private void showOperationError(String message) {
-        Alert alert = new Alert(Alert.AlertType.ERROR, message, ButtonType.OK);
-        alert.setHeaderText("Operation failed");
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle("Operation Error");
+        alert.setHeaderText("The operation could not be completed");
+
+        SVGPath cross = new SVGPath();
+        cross.setContent("M6 6l12 12 M18 6L6 18");
+        cross.getStyleClass().add("operation-error-icon-mark");
+        StackPane icon = new StackPane(cross);
+        icon.getStyleClass().add("operation-error-icon");
+        alert.setGraphic(icon);
+
+        Label messageLabel = new Label(
+                message == null || message.isBlank() ? "An unexpected error occurred." : message
+        );
+        messageLabel.setWrapText(true);
+        messageLabel.setMaxWidth(430);
+        messageLabel.getStyleClass().add("operation-error-message");
+
+        Label hintLabel = new Label("You can dismiss this message and try the operation again.");
+        hintLabel.setWrapText(true);
+        hintLabel.getStyleClass().add("operation-error-hint");
+
+        VBox content = new VBox(8, messageLabel, hintLabel);
+        content.getStyleClass().add("operation-error-content");
+        alert.getDialogPane().setContent(content);
+        alert.getDialogPane().getStyleClass().addAll("material-dialog", "operation-error-dialog");
+        URL stylesheet = MainWindow.class.getResource("app.css");
+        if (stylesheet != null) alert.getDialogPane().getStylesheets().add(stylesheet.toExternalForm());
+        alert.getDialogPane().setMinWidth(500);
+
+        Button dismissButton = (Button) alert.getDialogPane().lookupButton(ButtonType.OK);
+        dismissButton.setText("Dismiss");
+        dismissButton.getStyleClass().add("operation-error-dismiss");
+        if (userTable != null && userTable.getScene() != null) {
+            alert.initOwner(userTable.getScene().getWindow());
+        }
         alert.showAndWait();
     }
 

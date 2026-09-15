@@ -15,7 +15,7 @@ Quantis binaries are excluded from Git.
 ## Configure and run directly in IntelliJ IDEA
 
 The root `NetworkUserRegistration.iml` is explicitly included in Git. It defines the source root and portable,
-project-relative JavaFX and Bouncy Castle libraries. IntelliJ should load those libraries automatically. The JDK is
+project-relative JavaFX, Bouncy Castle, and JNA libraries. IntelliJ should load those libraries automatically. The JDK is
 still selected manually because IntelliJ stores SDK registrations outside the project.
 
 ### 1. Open the project
@@ -84,6 +84,13 @@ If IntelliJ reports `class file has wrong version`, check **Project Structure**,
 and run-configuration JRE. Class-file version 56 is Java 12, 58 is Java 14, 68 is Java 24, and 70 is Java 26. All
 project compilation and execution settings must use the bundled OpenJDK 26.0.2 SDK rather than an older system JDK.
 
+### JNA and native C library
+
+Confirm that `JNA 5.19.1` appears under **Project Structure | Modules | Dependencies**. The compiled x64 DLL is at
+`lib/native/rawdrive/rawdrive.dll`; keep the run configuration working directory set to `$PROJECT_DIR$`. To use the
+physical-drive screen, launch IntelliJ as Administrator. Rebuild native C changes with `build-native.ps1`; the
+w64devkit compiler is included in the repository.
+
 ## Build and run
 
 ```powershell
@@ -91,7 +98,7 @@ project compilation and execution settings must use the bundled OpenJDK 26.0.2 S
 .\run.ps1
 ```
 
-Both commands also work offline and use the project-local JDK rather than `PATH`.
+Both commands use the project-local JDK rather than `PATH`.
 
 ## Quantis
 
@@ -111,12 +118,13 @@ checklist are documented in `docs\ICONS.md`.
 
 ## Bouncy Castle
 
-Bouncy Castle Java 1.84 is bundled for offline use with provider, utility, and PKIX/CMS artifacts plus matching
+Bouncy Castle Java 1.84 is bundled with provider, utility, and PKIX/CMS artifacts plus matching
 sources, Javadocs, POM metadata, and SHA-256 records. Both IntelliJ and PowerShell builds include it automatically.
 Registration and usage examples are in `docs\BOUNCY_CASTLE.md`.
 
 ## Raw physical-drive writes
 
-A guarded Windows PowerShell bridge for explicit byte-offset writes, Java integration, safety requirements, and a
-non-destructive disk-image verification class are documented in `docs\RAW_DRIVE_WRITES.md`. Physical writes are
-restricted to explicitly selected USB disks that Windows reports as offline.
+A guarded Windows C library with direct JNA calls, the read-only JavaFX drive dropdown, and separate inventory,
+disk-image, and opt-in physical-write test classes are documented in `docs\RAW_DRIVE_WRITES.md`.
+The complete C compilation and JNA binding workflow is documented in
+`docs\C_JNA_DEVELOPMENT.md`.

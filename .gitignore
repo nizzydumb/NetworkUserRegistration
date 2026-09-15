@@ -54,6 +54,13 @@ logs/
 !/lib/jdk-26.0.2/bin/
 !/lib/jdk-26.0.2/bin/**
 /lib/openjdk-26.0.2_windows-x64_bin.zip
+/lib/w64devkit-x64-*.7z.exe
+
+# Portable native compiler is committed for fully offline DLL rebuilds.
+!/lib/w64devkit-2.10.0/
+!/lib/w64devkit-2.10.0/w64devkit/
+!/lib/w64devkit-2.10.0/w64devkit/bin/
+!/lib/w64devkit-2.10.0/w64devkit/bin/**
 
 # Quantis SDK binaries are installed locally from the licensed vendor package
 /lib/quantis/*.jar

@@ -5,6 +5,7 @@ $javaFxVersion = "26.0.2"
 $javaFxDirectory = Join-Path $projectRoot "lib\javafx-sdk-$javaFxVersion"
 $jdkDirectory = Join-Path $projectRoot "lib\jdk-26.0.2"
 $bouncyCastleDirectory = Join-Path $projectRoot "lib\bouncycastle-1.84"
+$jnaDirectory = Join-Path $projectRoot "lib\jna-5.19.1"
 $requiredFiles = @(
     "lib\javafx.base.jar",
     "lib\javafx.graphics.jar",
@@ -47,4 +48,10 @@ $missingBouncyCastleFiles = @($requiredBouncyCastleFiles | Where-Object {
 })
 if ($missingBouncyCastleFiles.Count -gt 0) {
     throw "The repository's offline Bouncy Castle libraries are incomplete. Missing: $($missingBouncyCastleFiles -join ', ')"
+}
+
+$requiredJnaFiles = @("jna-5.19.1.jar", "jna-platform-5.19.1.jar")
+$missingJnaFiles = @($requiredJnaFiles | Where-Object { -not (Test-Path (Join-Path $jnaDirectory $_)) })
+if ($missingJnaFiles.Count -gt 0) {
+    throw "The repository's offline JNA libraries are incomplete. Missing: $($missingJnaFiles -join ', ')"
 }

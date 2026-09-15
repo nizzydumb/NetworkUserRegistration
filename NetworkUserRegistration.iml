@@ -41,5 +41,18 @@
         </SOURCES>
       </library>
     </orderEntry>
+    <orderEntry type="module-library">
+      <library name="JNA 5.19.1">
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib/jna-5.19.1/jna-5.19.1.jar!/" />
+          <root url="jar://$MODULE_DIR$/lib/jna-5.19.1/jna-platform-5.19.1.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES>
+          <root url="jar://$MODULE_DIR$/lib/jna-5.19.1/jna-5.19.1-sources.jar!/" />
+          <root url="jar://$MODULE_DIR$/lib/jna-5.19.1/jna-platform-5.19.1-sources.jar!/" />
+        </SOURCES>
+      </library>
+    </orderEntry>
   </component>
 </module>

@@ -6,12 +6,16 @@ $javaRuntime = Join-Path $projectRoot "lib\jdk-26.0.2\bin\java.exe"
 $outputDir = Join-Path $projectRoot "out\production\NetworkUserRegistration"
 $quantisLib = Join-Path $projectRoot "lib\quantis"
 $bouncyCastleLib = Join-Path $projectRoot "lib\bouncycastle-1.84"
+$jnaLib = Join-Path $projectRoot "lib\jna-5.19.1"
 
 & (Join-Path $projectRoot "build.ps1")
 $bouncyCastleJars = @(Get-ChildItem -Path $bouncyCastleLib -Filter "*.jar" -File |
     Where-Object { $_.Name -notlike "*-sources.jar" -and $_.Name -notlike "*-javadoc.jar" } |
     ForEach-Object { $_.FullName })
-$runtimeClasspath = (@($outputDir) + $bouncyCastleJars) -join [IO.Path]::PathSeparator
+$jnaJars = @(Get-ChildItem -Path $jnaLib -Filter "*.jar" -File |
+    Where-Object { $_.Name -notlike "*-sources.jar" -and $_.Name -notlike "*-javadoc.jar" } |
+    ForEach-Object { $_.FullName })
+$runtimeClasspath = (@($outputDir) + $bouncyCastleJars + $jnaJars) -join [IO.Path]::PathSeparator
 & $javaRuntime `
     --module-path $javaFxLib `
     --add-modules javafx.controls `

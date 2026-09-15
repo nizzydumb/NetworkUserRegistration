@@ -1,93 +1,96 @@
-# Guarded raw byte-offset writes on Windows
+# Native/JNA physical-drive access on Windows
 
-Raw physical-drive writes can destroy filesystems, partition tables, recovery data, and operating systems. The
-implementation in this project deliberately supports physical writes only to a USB disk that Windows reports as
-offline. It never selects a disk automatically.
+This feature can permanently destroy partitions, filesystems, recovery data, and operating systems. The main
+window only contains a read-only physical-drive dropdown. There is no write page or write button. Physical writes
+are exposed through a deliberately explicit manual integration-test class.
 
-## Components
+## Architecture
 
-- `tools/write-raw-bytes.ps1`: guarded writer and read-back verification.
-- `storage.RawByteWriteRequest`: validates and stores a drive number, byte offset, and bytes.
-- `storage.WindowsRawByteWriter`: invokes the PowerShell writer from Java.
-- `storage.RawByteWriterVerification`: non-destructive disk-image test.
+- `native/rawdrive/raw_drive.c` is the Windows C implementation using `CreateFileW`, `DeviceIoControl`,
+  `SetFilePointerEx`, `WriteFile`, `FlushFileBuffers`, and `ReadFile`.
+- `lib/native/rawdrive/rawdrive.dll` is the compiled x64 library used at runtime.
+- `storage.RawDriveNative` contains the direct JNA declarations.
+- `storage.JnaPhysicalDriveService` exposes disk inventory and writes to Java.
+- `storage.PhysicalDriveInfo` is the dropdown model.
+- `storage.RawByteWriterVerification` tests the same DLL against a temporary image file only.
+- `storage.PhysicalDriveInventoryVerification` tests drive discovery without writing.
+- `storage.PhysicalDriveWriteManualTest` is the opt-in destructive integration test.
 
-## Before a physical write
+JNA does not bypass Windows permissions. Start IntelliJ itself with **Run as administrator**, then run the JavaFX
+application. DLL and JVM architecture must match; both bundled builds are Windows x64.
 
-1. Back up the target drive.
-2. Identify its disk number in Disk Management or with `Get-Disk`.
-3. Verify its model, capacity, and USB bus type. Disk numbers can change after reconnecting hardware.
-4. Take the intended USB disk offline in Disk Management or an elevated PowerShell session.
-5. Ensure the byte offset and data format come from the target device's documented layout.
+For the complete compiler, ABI mapping, IntelliJ, extension, verification, and troubleshooting procedure, see
+`docs/C_JNA_DEVELOPMENT.md`.
 
-The script rejects online disks and non-USB disks. It also validates the write range and reads the bytes back after
-flushing them.
+## Dependencies and IntelliJ
 
-## Dry run
+JNA 5.19.1 and JNA Platform 5.19.1 binaries and sources are under `lib/jna-5.19.1`. They are declared in
+`NetworkUserRegistration.iml`, so no Maven or internet access is required. The run configuration must use the
+project root as its working directory because the DLL is resolved from `lib/native/rawdrive/rawdrive.dll`.
 
-A dry run inspects the target but writes nothing:
-
-```powershell
-.\tools\write-raw-bytes.ps1 `
-    -DriveNumber 2 `
-    -ByteOffset 1048576 `
-    -HexBytes "DE AD BE EF"
-```
-
-Review the reported device path, model, size, offset, and byte count.
-
-## Explicit physical write
-
-Run PowerShell as Administrator and supply both execution gates:
+To rebuild the DLL after editing C:
 
 ```powershell
-.\tools\write-raw-bytes.ps1 `
-    -DriveNumber 2 `
-    -ByteOffset 1048576 `
-    -HexBytes "DE AD BE EF" `
-    -Execute `
-    -Confirmation "WRITE-PHYSICALDRIVE-2"
+.\build-native.ps1
 ```
 
-The address is a zero-based byte offset from the start of `\\.\PhysicalDrive2`. Hex input may contain spaces or
-`0x` prefixes. It must contain complete bytes.
+The script uses the committed w64devkit 2.10.0 compiler at
+`lib/w64devkit-2.10.0/w64devkit/bin/gcc.exe`. Compiler copyright notices are retained inside that distribution.
 
-## Java usage
+## Native return contract
 
-```java
-Path script = Path.of("tools", "write-raw-bytes.ps1");
-WindowsRawByteWriter writer = new WindowsRawByteWriter(script);
-RawByteWriteRequest request = new RawByteWriteRequest(
-        2,
-        1_048_576L,
-        new byte[]{(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF}
-);
+Zero means success. Positive values are Windows system error codes. Negative library codes are:
 
-RawWriteResult inspection = writer.dryRun(request);
-System.out.println(inspection.output());
+- `-1`: invalid argument
+- `-2`: disk is online
+- `-3`: disk contains the active Windows installation, or that check could not be performed safely
+- `-4`: write is outside the device/file boundary
+- `-5`: read-back differs from the requested bytes
 
-RawWriteResult write = writer.writePhysical(
-        request,
-        WindowsRawByteWriter.confirmationToken(request.driveNumber())
-);
-```
+The native `rd_write_physical` function repeats all critical checks even if it is called without the JavaFX UI. It
+rejects system disks, online disks, empty writes, writes over 1 MiB, and out-of-bounds ranges. It flushes and reads
+the requested range back before returning success. Because Windows raw-disk I/O is sector based, a byte-addressed
+request uses a read-modify-write of only the surrounding sector(s), preserving their other bytes.
 
-The Java process must itself be elevated for the physical write. Check `RawWriteResult.successful()` and retain its
-output in application logs. Do not build a UI that silently derives or hides the confirmation token.
+## Using the dropdown
 
-## Safe test
+The **Physical Drive** dropdown is always visible in the main-window header. It shows the disk number, capacity,
+model, and safety state. Selecting a drive has no side effect and cannot initiate a write.
 
-The verification class creates a 4096-byte temporary `.img` file, writes four bytes at offset 1024 through
-PowerShell, verifies the resulting file, checks invalid and out-of-range requests, and deletes it. The image mode
-accepts only files with an `.img` extension and never opens a physical device:
+Disk numbers can change after reconnecting hardware. Re-check the displayed model and size every time.
+
+## Safe verification
+
+This test creates and deletes a 4096-byte temporary image. It calls only `rd_write_image`; it never opens a
+`PhysicalDrive` path:
 
 ```powershell
 .\build.ps1
-$bc = Get-ChildItem lib\bouncycastle-1.84\*.jar |
-    Where-Object Name -NotLike "*-sources.jar" |
-    Where-Object Name -NotLike "*-javadoc.jar" |
-    ForEach-Object FullName
-$cp = (@("out\production\NetworkUserRegistration") + $bc) -join [IO.Path]::PathSeparator
-& lib\jdk-26.0.2\bin\java.exe -cp $cp storage.RawByteWriterVerification
+$cp = @(
+  "out\production\NetworkUserRegistration",
+  "lib\jna-5.19.1\jna-5.19.1.jar",
+  "lib\jna-5.19.1\jna-platform-5.19.1.jar"
+) -join [IO.Path]::PathSeparator
+& lib\jdk-26.0.2\bin\java.exe --enable-native-access=ALL-UNNAMED `
+  -cp $cp storage.RawByteWriterVerification
 ```
 
-Never use a physical disk in automated tests.
+Never use a real disk in automated tests.
+
+## Read-only inventory test
+
+Run `storage.PhysicalDriveInventoryVerification` from IntelliJ. It prints the elevation state and every drive found,
+then exits. It never calls the native write function.
+
+## Explicit physical-write test
+
+Run `storage.PhysicalDriveWriteManualTest` only against a disposable, backed-up disk that has been taken offline.
+With no program arguments it prints help and performs no write. An actual invocation requires all five arguments:
+
+```text
+--execute 2 0x100000 DEADBEEF WRITE-PHYSICALDRIVE-2
+```
+
+The test re-enumerates the explicitly numbered drive and rejects it unless it is offline and non-system. The native
+DLL repeats those checks, performs the sector-aware write, flushes it, and verifies the requested bytes by reading
+them back.
