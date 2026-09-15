@@ -114,3 +114,9 @@ checklist are documented in `docs\ICONS.md`.
 Bouncy Castle Java 1.84 is bundled for offline use with provider, utility, and PKIX/CMS artifacts plus matching
 sources, Javadocs, POM metadata, and SHA-256 records. Both IntelliJ and PowerShell builds include it automatically.
 Registration and usage examples are in `docs\BOUNCY_CASTLE.md`.
+
+## Raw physical-drive writes
+
+A guarded Windows PowerShell bridge for explicit byte-offset writes, Java integration, safety requirements, and a
+non-destructive disk-image verification class are documented in `docs\RAW_DRIVE_WRITES.md`. Physical writes are
+restricted to explicitly selected USB disks that Windows reports as offline.
