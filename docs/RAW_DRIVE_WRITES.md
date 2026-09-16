@@ -55,7 +55,9 @@ request uses a read-modify-write of only the surrounding sector(s), preserving t
 ## Using the dropdown
 
 The **Physical Drive** dropdown is always visible in the main-window header. It shows the disk number, capacity,
-model, and safety state. Selecting a drive has no side effect and cannot initiate a write.
+model, online/offline state, and whether a volume on the disk currently has a drive-letter or directory mount
+point. It starts with no selected disk, refreshes its inventory whenever it is opened, and re-queries the selected
+disk every two seconds. Selecting a drive has no side effect and cannot initiate a write.
 
 Disk numbers can change after reconnecting hardware. Re-check the displayed model and size every time.
 
@@ -84,13 +86,15 @@ then exits. It never calls the native write function.
 
 ## Explicit physical-write test
 
-Run `storage.PhysicalDriveWriteManualTest` only against a disposable, backed-up disk that has been taken offline.
+Run `storage.PhysicalDriveWriteManualTest` only against a disposable and fully backed-up disk. The implementation
+does not require the disk to be offline, but Windows or the storage driver may still reject raw writes while its
+volumes are mounted. A successful write to a mounted filesystem can corrupt it.
 With no program arguments it prints help and performs no write. An actual invocation requires all five arguments:
 
 ```text
 --execute 2 0x100000 DEADBEEF WRITE-PHYSICALDRIVE-2
 ```
 
-The test re-enumerates the explicitly numbered drive and rejects it unless it is offline and non-system. The native
-DLL repeats those checks, performs the sector-aware write, flushes it, and verifies the requested bytes by reading
-them back.
+The test re-enumerates the explicitly numbered drive and rejects the Windows system disk. The native DLL repeats
+the system-disk check, performs the sector-aware write, flushes it, and verifies the requested bytes by reading them
+back. Online/offline state remains visible in the inventory but is informational rather than an application gate.

@@ -133,12 +133,12 @@
     -fx-text-fill: #b3261e;
 }
 
-.drive-status-online {
-    -fx-background-color: #e8f0fe;
-    -fx-text-fill: #174ea6;
+.drive-status-mounted {
+    -fx-background-color: #fef3c7;
+    -fx-text-fill: #92400e;
 }
 
-.drive-status-offline {
+.drive-status-unmounted {
     -fx-background-color: #e6f4ea;
     -fx-text-fill: #137333;
 }
@@ -147,11 +147,11 @@
     -fx-fill: #d93025;
 }
 
-.drive-dot-online {
-    -fx-fill: #1a73e8;
+.drive-dot-mounted {
+    -fx-fill: #f59e0b;
 }
 
-.drive-dot-offline {
+.drive-dot-unmounted {
     -fx-fill: #188038;
 }
 

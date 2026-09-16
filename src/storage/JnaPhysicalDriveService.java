@@ -19,24 +19,29 @@ public final class JnaPhysicalDriveService {
     public List<PhysicalDriveInfo> listPhysicalDrives() {
         List<PhysicalDriveInfo> drives = new ArrayList<>();
         for (int number = 0; number <= MAX_DRIVE_NUMBER; number++) {
-            PhysicalDriveInfo drive = query(number);
+            PhysicalDriveInfo drive = queryPhysicalDrive(number);
             if (drive != null) drives.add(drive);
         }
         return List.copyOf(drives);
     }
 
-    private PhysicalDriveInfo query(int number) {
+    public PhysicalDriveInfo queryPhysicalDrive(int number) {
+        if (number < 0 || number > MAX_DRIVE_NUMBER) {
+            throw new IllegalArgumentException("Physical drive number must be between 0 and " + MAX_DRIVE_NUMBER + ".");
+        }
         LongByReference size = new LongByReference();
         IntByReference offline = new IntByReference();
+        IntByReference mounted = new IntByReference();
         IntByReference system = new IntByReference();
         IntByReference bus = new IntByReference();
         int characters = 256;
         Memory model = new Memory((long) characters * Native.WCHAR_SIZE);
         model.clear();
-        int result = RawDriveNative.INSTANCE.rd_query_drive(number, size, offline, system, bus, model, characters);
+        int result = RawDriveNative.INSTANCE.rd_query_drive(
+                number, size, offline, mounted, system, bus, model, characters);
         if (result == 2 || result == 3 || result == 15) return null;
         requireSuccess(result, "Querying PhysicalDrive" + number);
-        return new PhysicalDriveInfo(number, size.getValue(), offline.getValue() != 0,
+        return new PhysicalDriveInfo(number, size.getValue(), offline.getValue() != 0, mounted.getValue() != 0,
                 system.getValue() != 0, bus.getValue(), model.getWideString(0).strip());
     }
 
@@ -58,7 +63,7 @@ public final class JnaPhysicalDriveService {
         if (result == 0) return;
         String detail = switch (result) {
             case -1 -> "invalid argument";
-            case -2 -> "the disk is online; take it offline first";
+            case -2 -> "legacy offline-policy rejection from an older native library; rebuild rawdrive.dll";
             case -3 -> "the disk contains the running Windows installation";
             case -4 -> "the write exceeds the device boundary";
             case -5 -> "read-back verification did not match";

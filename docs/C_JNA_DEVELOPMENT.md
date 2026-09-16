@@ -132,6 +132,11 @@ The native functions use the compiler's default C calling convention, and `RawDr
 `Library`, which uses the corresponding default mapper. If a future function is declared `__stdcall`, the Java
 interface must use JNA's `StdCallLibrary` consistently instead.
 
+`rd_query_drive` reports `offline` and `mounted` separately. `offline` is the Windows disk attribute. `mounted`
+means at least one volume whose extents belong to that disk currently has a drive-letter or directory mount point,
+as discovered with `FindFirstVolumeW`, `IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS`, and
+`GetVolumePathNamesForVolumeNameW`.
+
 ## Adding another native function
 
 Use this sequence so the C and Java declarations do not drift apart:
@@ -180,8 +185,9 @@ Use the least privileged and least destructive verification first:
 3. Run `storage.RawByteWriterVerification`. It calls `rd_write_image` against a temporary 4096-byte file and never
    opens a physical-drive path.
 4. Run `storage.PhysicalDriveInventoryVerification` to exercise read-only drive discovery.
-5. Use `storage.PhysicalDriveWriteManualTest` only when deliberately testing with a disposable, backed-up, offline
-   disk. With no arguments it performs no write.
+5. Use `storage.PhysicalDriveWriteManualTest` only when deliberately testing with a disposable, fully backed-up
+   disk. With no arguments it performs no write. Online disks are permitted by project policy, although Windows may
+   reject them and mounted filesystems can be corrupted.
 
 Never substitute a real disk into an automated test. The manual write test requires all of these arguments:
 
@@ -210,8 +216,8 @@ Add `--enable-native-access=ALL-UNNAMED`. The full application also includes `ja
 ### Windows error 5: Access is denied
 
 For inventory or a physical write, start IntelliJ itself with **Run as administrator**; elevating only a separate
-terminal does not elevate an already-running IntelliJ process. A physical write additionally requires the selected
-non-system disk to be offline. Compilation and disk-image verification do not require elevation.
+terminal does not elevate an already-running IntelliJ process. Compilation and disk-image verification do not
+require elevation. Online raw writes may still be rejected by Windows or the device driver.
 
 ### Error 193: `%1 is not a valid Win32 application`
 
@@ -228,7 +234,7 @@ with `objdump`, check spelling and parameter order, and restart Java.
 - Treat the Java UI as untrusted input; repeat destructive-operation checks in C.
 - Never infer or automatically select a physical write target.
 - Check offset plus length without integer overflow and enforce a maximum transfer size.
-- Keep system-disk and offline-state checks fail-closed.
+- Keep the system-disk check fail-closed. Treat reported online/offline state as informational unless policy changes.
 - Flush writes and verify them by reading back.
 - Log target number, offset, length, result, and error code, but avoid logging sensitive payload bytes.
 - Commit C source, header, build script, compiler licenses, JNA artifacts, and the matching built DLL together so an

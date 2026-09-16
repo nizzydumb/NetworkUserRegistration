@@ -29,7 +29,7 @@ public final class PhysicalDriveWriteManualTest {
                 .filter(candidate -> candidate.number() == driveNumber)
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("PhysicalDrive" + driveNumber + " was not detected."));
-        if (!drive.writableByPolicy()) {
+        if (drive.systemDisk()) {
             throw new IllegalStateException("Refusing target: " + drive);
         }
 

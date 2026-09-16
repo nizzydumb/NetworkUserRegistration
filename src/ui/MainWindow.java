@@ -2,6 +2,8 @@ package ui;
 
 import javafx.animation.PauseTransition;
 import javafx.animation.SequentialTransition;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.beans.Observable;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.BooleanBinding;
@@ -70,6 +72,7 @@ public class MainWindow {
     private Button editUserButton;
     private Circle syncStatusLed;
     private Label syncStatusLabel;
+    private boolean physicalDriveRefreshRunning;
 
     public MainWindow(RegistrationService service) {
         this.service = service;
@@ -126,13 +129,23 @@ public class MainWindow {
         Label physicalDriveLabel = new Label("PHYSICAL DRIVE");
         physicalDriveLabel.getStyleClass().add("drive-selector-label");
         ComboBox<PhysicalDriveInfo> physicalDriveBox = new ComboBox<>();
-        physicalDriveBox.setPromptText("No physical drives detected");
+        physicalDriveBox.setPromptText("Select a physical drive");
         physicalDriveBox.setPrefWidth(350);
         physicalDriveBox.setMaxWidth(350);
         physicalDriveBox.getStyleClass().add("drive-selector");
         physicalDriveBox.setCellFactory(list -> createPhysicalDriveCell(false));
         physicalDriveBox.setButtonCell(createPhysicalDriveCell(true));
-        loadPhysicalDrives(physicalDriveBox);
+        JnaPhysicalDriveService driveService = new JnaPhysicalDriveService();
+        loadPhysicalDrives(physicalDriveBox, driveService, null);
+        physicalDriveBox.setOnShowing(event -> {
+            PhysicalDriveInfo selected = physicalDriveBox.getValue();
+            loadPhysicalDrives(physicalDriveBox, driveService, selected == null ? null : selected.number());
+        });
+        Timeline selectedDriveRefresh = new Timeline(new KeyFrame(
+                Duration.seconds(2), event -> refreshSelectedPhysicalDrive(physicalDriveBox, driveService)
+        ));
+        selectedDriveRefresh.setCycleCount(Timeline.INDEFINITE);
+        selectedDriveRefresh.play();
         VBox driveSelector = new VBox(5, physicalDriveLabel, physicalDriveBox);
         driveSelector.getStyleClass().add("drive-selector-group");
         driveSelector.setAlignment(Pos.CENTER_RIGHT);
@@ -147,14 +160,56 @@ public class MainWindow {
         return header;
     }
 
-    private void loadPhysicalDrives(ComboBox<PhysicalDriveInfo> driveBox) {
+    private void loadPhysicalDrives(ComboBox<PhysicalDriveInfo> driveBox,
+                                    JnaPhysicalDriveService driveService,
+                                    Integer selectedNumber) {
         try {
-            driveBox.getItems().setAll(new JnaPhysicalDriveService().listPhysicalDrives());
-            if (!driveBox.getItems().isEmpty()) driveBox.getSelectionModel().selectFirst();
+            driveBox.getItems().setAll(driveService.listPhysicalDrives());
+            driveBox.getSelectionModel().clearSelection();
+            if (selectedNumber != null) {
+                driveBox.getItems().stream()
+                        .filter(drive -> drive.number() == selectedNumber)
+                        .findFirst()
+                        .ifPresent(driveBox.getSelectionModel()::select);
+            }
         } catch (Throwable exception) {
             driveBox.setPromptText("Drive scan failed - see application.log");
             AppLogger.error("Physical drive inventory failed", exception);
         }
+    }
+
+    private void refreshSelectedPhysicalDrive(ComboBox<PhysicalDriveInfo> driveBox,
+                                              JnaPhysicalDriveService driveService) {
+        PhysicalDriveInfo selected = driveBox.getValue();
+        if (selected == null || driveBox.isShowing() || physicalDriveRefreshRunning) return;
+        physicalDriveRefreshRunning = true;
+        Task<PhysicalDriveInfo> refreshTask = new Task<>() {
+            @Override
+            protected PhysicalDriveInfo call() {
+                return driveService.queryPhysicalDrive(selected.number());
+            }
+        };
+        refreshTask.setOnSucceeded(event -> {
+            physicalDriveRefreshRunning = false;
+            PhysicalDriveInfo refreshed = refreshTask.getValue();
+            if (refreshed == null) {
+                driveBox.getItems().remove(selected);
+                driveBox.getSelectionModel().clearSelection();
+                return;
+            }
+            int index = driveBox.getItems().indexOf(selected);
+            if (index >= 0 && !refreshed.equals(selected)) {
+                driveBox.getItems().set(index, refreshed);
+                driveBox.getSelectionModel().select(refreshed);
+            }
+        });
+        refreshTask.setOnFailed(event -> {
+            physicalDriveRefreshRunning = false;
+            AppLogger.error("Selected physical drive state refresh failed", refreshTask.getException());
+        });
+        Thread worker = new Thread(refreshTask, "physical-drive-state-refresh");
+        worker.setDaemon(true);
+        worker.start();
     }
 
     private ListCell<PhysicalDriveInfo> createPhysicalDriveCell(boolean compact) {
@@ -171,7 +226,7 @@ public class MainWindow {
 
                 Circle stateDot = new Circle(4);
                 stateDot.getStyleClass().add(drive.systemDisk() ? "drive-dot-system"
-                        : (drive.offline() ? "drive-dot-offline" : "drive-dot-online"));
+                        : (drive.mounted() ? "drive-dot-mounted" : "drive-dot-unmounted"));
 
                 Label diskName = new Label("Disk " + drive.number());
                 diskName.getStyleClass().add("drive-disk-number");
@@ -179,7 +234,8 @@ public class MainWindow {
                 diskName.setPrefWidth(58);
 
                 if (compact) {
-                    Label summary = new Label(drive.sizeLabel() + "  ·  " + drive.model());
+                    Label summary = new Label((drive.mounted() ? "Mounted" : "Not mounted")
+                            + "  ·  " + drive.sizeLabel() + "  ·  " + drive.model());
                     summary.getStyleClass().add("drive-summary");
                     summary.setMaxWidth(Double.MAX_VALUE);
                     HBox.setHgrow(summary, Priority.ALWAYS);
@@ -195,14 +251,15 @@ public class MainWindow {
                 name.getStyleClass().add("drive-name");
                 name.setMaxWidth(Double.MAX_VALUE);
 
-                Label details = new Label(drive.devicePath() + "  ·  " + drive.sizeLabel());
+                Label details = new Label(drive.devicePath() + "  ·  " + drive.sizeLabel()
+                        + "  ·  " + (drive.offline() ? "OFFLINE" : "ONLINE"));
                 details.getStyleClass().add("drive-details");
 
-                String statusText = drive.systemDisk() ? "SYSTEM" : (drive.offline() ? "OFFLINE" : "ONLINE");
+                String statusText = drive.systemDisk() ? "SYSTEM" : (drive.mounted() ? "MOUNTED" : "UNMOUNTED");
                 Label status = new Label(statusText);
                 status.getStyleClass().addAll("drive-status",
                         drive.systemDisk() ? "drive-status-system"
-                                : (drive.offline() ? "drive-status-offline" : "drive-status-online"));
+                                : (drive.mounted() ? "drive-status-mounted" : "drive-status-unmounted"));
 
                 HBox titleRow = new HBox(8, stateDot, diskName, name);
                 titleRow.setAlignment(Pos.CENTER_LEFT);

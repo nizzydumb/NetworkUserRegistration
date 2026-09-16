@@ -75,6 +75,54 @@ static int is_system_disk_number(int disk_number) {
     return 0;
 }
 
+static int volume_has_mount_point(const wchar_t *volume_name) {
+    wchar_t paths[4096];
+    DWORD required = 0;
+    ZeroMemory(paths, sizeof(paths));
+    if (GetVolumePathNamesForVolumeNameW(volume_name, paths,
+                                         (DWORD)(sizeof(paths) / sizeof(paths[0])), &required)) {
+        return paths[0] != L'\0';
+    }
+    return 0;
+}
+
+static int disk_has_mounted_volume(int disk_number) {
+    wchar_t volume_name[MAX_PATH];
+    wchar_t handle_name[MAX_PATH];
+    HANDLE search = FindFirstVolumeW(volume_name, MAX_PATH);
+    if (search == INVALID_HANDLE_VALUE) return 0;
+    do {
+        BYTE buffer[sizeof(VOLUME_DISK_EXTENTS) + sizeof(DISK_EXTENT) * 32];
+        VOLUME_DISK_EXTENTS *extents = (VOLUME_DISK_EXTENTS *)buffer;
+        DWORD returned = 0;
+        DWORD index;
+        HANDLE volume;
+        size_t length;
+        wcsncpy(handle_name, volume_name, MAX_PATH - 1);
+        handle_name[MAX_PATH - 1] = L'\0';
+        length = wcslen(handle_name);
+        if (length > 0 && handle_name[length - 1] == L'\\') handle_name[length - 1] = L'\0';
+        volume = CreateFileW(handle_name, 0,
+                             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                             NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (volume == INVALID_HANDLE_VALUE) continue;
+        if (DeviceIoControl(volume, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, NULL, 0,
+                            buffer, sizeof(buffer), &returned, NULL)) {
+            for (index = 0; index < extents->NumberOfDiskExtents; index++) {
+                if ((int)extents->Extents[index].DiskNumber == disk_number &&
+                    volume_has_mount_point(volume_name)) {
+                    CloseHandle(volume);
+                    FindVolumeClose(search);
+                    return 1;
+                }
+            }
+        }
+        CloseHandle(volume);
+    } while (FindNextVolumeW(search, volume_name, MAX_PATH));
+    FindVolumeClose(search);
+    return 0;
+}
+
 static void copy_descriptor_text(wchar_t *destination, int capacity,
                                  const BYTE *descriptor, DWORD descriptor_size,
                                  DWORD offset) {
@@ -102,7 +150,7 @@ RD_API int rd_is_elevated(void) {
 }
 
 RD_API int rd_query_drive(int drive_number, uint64_t *size_bytes, int *offline,
-                          int *system_disk, int *bus_type,
+                          int *mounted, int *system_disk, int *bus_type,
                           wchar_t *model, int model_capacity) {
     HANDLE disk;
     GET_LENGTH_INFORMATION length;
@@ -111,7 +159,7 @@ RD_API int rd_query_drive(int drive_number, uint64_t *size_bytes, int *offline,
     STORAGE_DEVICE_DESCRIPTOR *descriptor = (STORAGE_DEVICE_DESCRIPTOR *)descriptor_buffer;
     DWORD returned = 0;
     int result;
-    if (drive_number < 0 || size_bytes == NULL || offline == NULL ||
+    if (drive_number < 0 || size_bytes == NULL || offline == NULL || mounted == NULL ||
         system_disk == NULL || bus_type == NULL || model == NULL || model_capacity < 2) {
         return RD_ERROR_INVALID_ARGUMENT;
     }
@@ -126,6 +174,7 @@ RD_API int rd_query_drive(int drive_number, uint64_t *size_bytes, int *offline,
     *size_bytes = (uint64_t)length.Length.QuadPart;
     result = query_offline(disk, offline);
     if (result != RD_OK) { CloseHandle(disk); return result; }
+    *mounted = disk_has_mounted_volume(drive_number);
     *system_disk = is_system_disk_number(drive_number);
     *bus_type = BusTypeUnknown;
     ZeroMemory(&query, sizeof(query));
@@ -218,15 +267,11 @@ RD_API int rd_write_physical(int drive_number, uint64_t offset,
     HANDLE disk;
     GET_LENGTH_INFORMATION disk_length;
     DWORD returned;
-    int offline;
     int result;
     if (drive_number < 0) return RD_ERROR_INVALID_ARGUMENT;
     if (is_system_disk_number(drive_number)) return RD_ERROR_SYSTEM_DISK;
     disk = open_disk(drive_number, GENERIC_READ | GENERIC_WRITE);
     if (disk == INVALID_HANDLE_VALUE) return win_error();
-    result = query_offline(disk, &offline);
-    if (result != RD_OK) { CloseHandle(disk); return result; }
-    if (!offline) { CloseHandle(disk); return RD_ERROR_NOT_OFFLINE; }
     if (!DeviceIoControl(disk, IOCTL_DISK_GET_LENGTH_INFO, NULL, 0,
                          &disk_length, sizeof(disk_length), &returned, NULL)) {
         result = win_error(); CloseHandle(disk); return result;

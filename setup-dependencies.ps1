@@ -30,7 +30,14 @@ if ($missingFiles.Count -gt 0) {
     throw "The repository's offline JavaFX SDK is incomplete. Missing: $($missingFiles -join ', ')"
 }
 
-$requiredJdkFiles = @("bin\java.exe", "bin\javac.exe", "lib\modules", "release")
+$requiredJdkFiles = @(
+    "bin\java.exe",
+    "bin\javac.exe",
+    "bin\jar.exe",
+    "bin\jpackage.exe",
+    "lib\modules",
+    "release"
+)
 $missingJdkFiles = @($requiredJdkFiles | Where-Object {
     -not (Test-Path (Join-Path $jdkDirectory $_))
 })

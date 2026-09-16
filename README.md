@@ -100,6 +100,18 @@ w64devkit compiler is included in the repository.
 
 Both commands use the project-local JDK rather than `PATH`.
 
+## Build the Windows application image
+
+Create the JAR, private runtime, native libraries, and UAC-enabled Windows launcher with:
+
+```powershell
+.\build-release.ps1
+```
+
+Run the resulting `dist\NetworkUserRegistration\NetworkUserRegistration.exe`. Distribute the entire
+`dist\NetworkUserRegistration` directory, not the JAR or EXE alone. See `docs\WINDOWS_PACKAGING.md` for the package
+layout, dependency list, UAC behavior, Quantis handling, verification, and troubleshooting instructions.
+
 ## Quantis
 
 The direct Java JNI declarations are included in the source tree. Install the official Quantis driver and place
