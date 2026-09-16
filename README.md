@@ -9,8 +9,9 @@
 
 The repository contains both the complete Windows x64 OpenJDK 26.0.2 distribution and the complete extracted
 Windows x64 JavaFX 26.0.2 SDK. No network connection or system Java installation is required to compile and run
-the application. User-specific IntelliJ settings, build output, logs, redundant download archives, and proprietary
-Quantis binaries are excluded from Git.
+the application. User-specific IntelliJ settings, build output, logs, and redundant download archives are excluded
+from Git. The repository also contains the redistributable Quantis 20.2.3 USB driver, native source, and a project-built
+Windows x64 JNI library.
 
 ## Configure and run directly in IntelliJ IDEA
 
@@ -114,9 +115,9 @@ layout, dependency list, UAC behavior, Quantis handling, verification, and troub
 
 ## Quantis
 
-The direct Java JNI declarations are included in the source tree. Install the official Quantis driver and place
-`Quantis.dll` plus its native dependencies under `lib\quantis`. See `lib\quantis\README.md` for configuration and
-device detection examples. Vendor binaries are not stored in Git.
+The direct Java JNI declarations and Windows x64 `Quantis.dll` are included. A one-time installation of the signed
+ID Quantique USB driver is still required on every Windows computer. See `docs\QUANTIS_USB_SETUP.md` for driver
+installation, IntelliJ configuration, device verification, rebuilding the DLL, packaging, and troubleshooting.
 
 ## NIST SP 800-22
 

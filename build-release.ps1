@@ -23,6 +23,7 @@ function Reset-ProjectDirectory([string]$path, [string]$expectedParent) {
 }
 
 & (Join-Path $projectRoot "build-native.ps1")
+& (Join-Path $projectRoot "build-quantis.ps1")
 & (Join-Path $projectRoot "build.ps1")
 Reset-ProjectDirectory $staging (Join-Path $projectRoot "out")
 New-Item -ItemType Directory -Force -Path $dist | Out-Null
@@ -77,6 +78,15 @@ if (Test-Path -LiteralPath $quantisDirectory) {
 if ($LASTEXITCODE -ne 0) { throw "jpackage failed with exit code $LASTEXITCODE" }
 
 Move-Item -LiteralPath (Join-Path $dist "NetworkUserRegistrationApp") -Destination $image
+$quantisRoot = Join-Path $projectRoot "third_party\quantis-20.2.3"
+$quantisDriverDestination = Join-Path $image "drivers\QuantisUsb"
+New-Item -ItemType Directory -Force -Path $quantisDriverDestination | Out-Null
+Copy-Item -Path (Join-Path $quantisRoot "driver\QuantisUsb\*") `
+    -Destination $quantisDriverDestination -Recurse -Force
+Copy-Item -LiteralPath (Join-Path $quantisRoot "LICENSE.txt") `
+    -Destination (Join-Path $image "Quantis-LICENSE.txt") -Force
+Copy-Item -LiteralPath (Join-Path $projectRoot "docs\QUANTIS_USB_SETUP.md") `
+    -Destination (Join-Path $image "QUANTIS_USB_SETUP.md") -Force
 $launcherDirectory = Join-Path $projectRoot "packaging\windows"
 $resource = Join-Path $staging "elevated-launcher-resource.o"
 & (Join-Path $gccBin "windres.exe") -O coff `

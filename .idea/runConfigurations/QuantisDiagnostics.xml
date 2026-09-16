@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Quantis diagnostics" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="random.QuantisDiagnostics" />
+    <option name="VM_PARAMETERS" value="--enable-native-access=ALL-UNNAMED -Djava.library.path=&quot;$PROJECT_DIR$/lib/quantis&quot;" />
+    <option name="PROGRAM_PARAMETERS" value="--nist" />
+    <module name="NetworkUserRegistration" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

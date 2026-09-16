@@ -1,0 +1,143 @@
+; ****************************************************************************
+; *
+; *   Filename:  QuantisUsb.inf
+; *
+; *   Abstract:  Quantis USB and PCI drivers.
+; *
+; *              Supported operating systems: 
+; *                - Windows XP (32-bit only)
+; *                - Windows 2003
+; *                - Windows Vista
+; *                - Windows 2008
+; *                - Windows 7
+; *
+; *   Last Update: Apr 1, 2010 
+; *
+; *
+; *   Copyright (c) 2004-2010 ID Quantique SA.
+; *
+; ****************************************************************************
+
+
+[Version]
+Signature = "$Windows NT$"
+Class = %ClassName%
+ClassGuid = {F2F5F1E5-380E-4194-8FC0-ED5AF63E93DF}
+Provider = %IDQ%
+CatalogFile = QuantisUSB.cat
+DriverVer = 04/01/2010, 2.1
+
+[ClassInstall32] 
+AddReg = ClassAddReg
+
+[ClassInstall32.NTamd64]
+AddReg = ClassAddReg
+
+[ClassAddReg]
+HKR,,,,"%ClassName%"
+; Use Custom icon: http://download.microsoft.com/download/9/c/5/9c5b2167-8017-4bae-9fde-d599bac8184a/CustomIcon.docx
+HKR,,Icon,,-18
+HKR,,DeviceCharacteristics,0x10001,0x100     ;Use same security checks on relative opens
+HKR,,Security,,"D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GA;;;AU)" ;Allow generic all access to system and built-in Admin and Authenticated users. 
+
+
+; ========== Manufacturer/Models sections ===========
+
+[Manufacturer]
+%IDQ% = QuantisUSB, NTx86, NTamd64
+
+[QuantisUSB.NTx86]
+%USB\Quantis% = WinUSB_Install, USB\VID_0ABA&PID_0102
+
+[QuantisUSB.NTamd64]
+%USB\Quantis% = WinUSB_Install, USB\VID_0ABA&PID_0102
+
+
+; ================== Installation ==================
+
+[WinUSB_Install]
+; The Include and Needs directives are required for installing WinUSB on 
+; Windows Vista systems. Windows XP systems ignore these directives. 
+Include = WinUSB.inf
+Needs = WinUSB.NT
+AddProperty=Device_Properties
+
+[Device_Properties]
+DeviceIcon,,,,"-20"
+
+[WinUSB_Install.Services]
+; The Include directive in the includes the system-supplied INF for WinUSB. 
+; This INF is installed by the WinUSB co-installer if it is not already on 
+; the target system. The AddService directive specifies WinUsb.sys as the 
+; device's function driver.
+Include = WinUSB.inf
+AddService = WinUSB, 0x00000002, WinUSB_ServiceInstall
+
+[WinUSB_ServiceInstall]
+; This section contains the data for installing WinUsb.sys as a service.
+DisplayName = %WinUSB_SvcDesc%
+ServiceType = 1
+StartType = 3
+ErrorControl = 1
+ServiceBinary = %12%\WinUSB.sys
+
+[WinUSB_Install.Wdf]
+; The KmdfService directive installs WinUsb.sys as a kernel-mode service. 
+; The referenced WinUSB_Install_Lib section specifies the KMDF library version.
+KmdfService = WinUSB, WinUSB_Install_Lib
+
+[WinUSB_Install_Lib]
+; WdfLibraryVersion
+KmdfLibraryVersion = 1.9 
+
+[WinUSB_Install.HW]
+; This section specifies the device interface globally unique identifier 
+; (GUID) for our device. The AddReg directive puts the interface GUID in a 
+; standard registry value.
+; When WinUsb.sys is loaded as the device's function driver, it reads the 
+; registry value and uses the specified GUID to represent the device interface.
+AddReg = Dev_AddReg
+
+[Dev_AddReg]
+HKR,,DeviceInterfaceGUIDs,0x00010000,"{6476DB04-8D6C-49f5-BCF3-E2C1FC313A18}"
+
+[WinUSB_Install.CoInstallers]
+; This section, including the referenced AddReg and CopyFiles sections, 
+; contains data and instructions to install the WinUSB and KMDF co installers 
+; and associate them with the device.
+AddReg = CoInstallers_AddReg
+CopyFiles = CoInstallers_CopyFiles
+
+[CoInstallers_AddReg]
+HKR,,CoInstallers32,0x00010000,"WdfCoInstaller01009.dll,WdfCoInstaller","WinUSBCoInstaller2.dll"
+
+[CoInstallers_CopyFiles]
+WinUSBCoInstaller2.dll
+WdfCoInstaller01009.dll
+
+[DestinationDirs]
+CoInstallers_CopyFiles = 11
+
+; ================== Source Media Section ==================
+
+[SourceDisksNames]
+; There are separate co-installers for the x86 and x64 versions of Windows. 
+1 = %MediaDescription%,,,\x86
+2 = %MediaDescription%,,,\amd64
+
+[SourceDisksFiles.x86]
+WinUSBCoInstaller2.dll = 1
+WdfCoInstaller01009.dll = 1
+
+[SourceDisksFiles.amd64]
+WinUSBCoInstaller2.dll = 2
+WdfCoInstaller01009.dll = 2
+
+; ==================== Strings =====================
+
+[Strings]
+IDQ = "ID Quantique SA"
+ClassName = "IDQ devices"
+USB\Quantis = "Quantis USB Random Number Generator"
+MediaDescription = "Quantis USB Installation Disc"
+WinUSB_SvcDesc = "Quantis WinUSB Driver Service"

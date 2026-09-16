@@ -1,7 +1,5 @@
 package ui;
 
-import javafx.animation.PauseTransition;
-import javafx.animation.SequentialTransition;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.beans.Observable;
@@ -32,6 +30,7 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.BorderPane;
@@ -50,6 +49,9 @@ import javafx.util.Duration;
 import model.Network;
 import model.NetworkUser;
 import logging.AppLogger;
+import random.QuantisDeviceDetector;
+import random.QuantisDeviceStatus;
+import random.QuantisDeviceType;
 import service.RegistrationService;
 import storage.JnaPhysicalDriveService;
 import storage.PhysicalDriveInfo;
@@ -70,8 +72,9 @@ public class MainWindow {
     private Button addUserButton;
     private Button editNetworkButton;
     private Button editUserButton;
-    private Circle syncStatusLed;
-    private Label syncStatusLabel;
+    private Circle quantisStatusLed;
+    private Label quantisStatusLabel;
+    private boolean quantisStatusRefreshRunning;
     private boolean physicalDriveRefreshRunning;
 
     public MainWindow(RegistrationService service) {
@@ -84,7 +87,7 @@ public class MainWindow {
         BorderPane root = new BorderPane();
         root.setTop(createHeader());
         root.setCenter(createBody(stage));
-        root.setBottom(createSyncStatusBar());
+        root.setBottom(createStatusBar());
         root.getStyleClass().add("app-root");
 
         Scene scene = new Scene(root, 1000, 620);
@@ -104,7 +107,7 @@ public class MainWindow {
             networkList.getSelectionModel().selectFirst();
         }
 
-        startSyncStatusDemo();
+        startQuantisStatusMonitoring();
     }
 
     private void setWindowIcon(Stage stage) {
@@ -421,13 +424,13 @@ public class MainWindow {
         return splitPane;
     }
 
-    private HBox createSyncStatusBar() {
-        syncStatusLed = new Circle(5);
-        syncStatusLed.getStyleClass().add("sync-led");
-        syncStatusLabel = new Label();
-        syncStatusLabel.getStyleClass().add("sync-label");
+    private HBox createStatusBar() {
+        quantisStatusLed = new Circle(5);
+        quantisStatusLed.getStyleClass().add("sync-led");
+        quantisStatusLabel = new Label();
+        quantisStatusLabel.getStyleClass().add("sync-label");
 
-        HBox syncTab = new HBox(7, syncStatusLed, syncStatusLabel);
+        HBox syncTab = new HBox(7, quantisStatusLed, quantisStatusLabel);
         syncTab.setAlignment(Pos.CENTER_LEFT);
         syncTab.setPadding(new Insets(5, 10, 5, 10));
         syncTab.getStyleClass().add("sync-tab");
@@ -437,23 +440,56 @@ public class MainWindow {
         statusBar.setPadding(new Insets(0, 18, 12, 18));
         statusBar.getStyleClass().add("status-bar");
 
-        setSyncStatus(SyncStatus.ERROR);
+        setQuantisIndicator(QuantisIndicator.CHECKING, "Checking the Quantis USB connection.");
         return statusBar;
     }
 
-    private void startSyncStatusDemo() {
-        PauseTransition switchToInit = new PauseTransition(Duration.seconds(5));
-        switchToInit.setOnFinished(event -> setSyncStatus(SyncStatus.INITIALIZING));
-
-        PauseTransition switchToOk = new PauseTransition(Duration.seconds(5));
-        switchToOk.setOnFinished(event -> setSyncStatus(SyncStatus.OK));
-
-        new SequentialTransition(switchToInit, switchToOk).play();
+    private void startQuantisStatusMonitoring() {
+        refreshQuantisStatus();
+        Timeline refreshTimeline = new Timeline(new KeyFrame(
+                Duration.seconds(3), event -> refreshQuantisStatus()
+        ));
+        refreshTimeline.setCycleCount(Timeline.INDEFINITE);
+        refreshTimeline.play();
     }
 
-    private void setSyncStatus(SyncStatus status) {
-        syncStatusLed.setFill(status.color);
-        syncStatusLabel.setText(status.label);
+    private void refreshQuantisStatus() {
+        if (quantisStatusRefreshRunning) return;
+        quantisStatusRefreshRunning = true;
+
+        Task<QuantisDeviceStatus> refreshTask = new Task<>() {
+            @Override
+            protected QuantisDeviceStatus call() {
+                return QuantisDeviceDetector.check(QuantisDeviceType.USB, 0);
+            }
+        };
+        refreshTask.setOnSucceeded(event -> {
+            quantisStatusRefreshRunning = false;
+            QuantisDeviceStatus status = refreshTask.getValue();
+            setQuantisIndicator(
+                    status.connected() ? QuantisIndicator.AVAILABLE : QuantisIndicator.UNAVAILABLE,
+                    status.message()
+            );
+        });
+        refreshTask.setOnFailed(event -> {
+            quantisStatusRefreshRunning = false;
+            Throwable exception = refreshTask.getException();
+            String details = exception == null ? "Quantis status check failed." : exception.getMessage();
+            setQuantisIndicator(QuantisIndicator.UNAVAILABLE, details);
+            AppLogger.error("Quantis USB status refresh failed", exception);
+        });
+
+        Thread worker = new Thread(refreshTask, "quantis-status-refresh");
+        worker.setDaemon(true);
+        worker.start();
+    }
+
+    private void setQuantisIndicator(QuantisIndicator status, String details) {
+        quantisStatusLed.setFill(status.color);
+        quantisStatusLabel.setText(status.label);
+        quantisStatusLabel.setTooltip(new Tooltip(
+                details == null || details.isBlank() ? status.label : details
+        ));
     }
 
     private VBox createNetworksPanel(Stage owner) {
@@ -1192,15 +1228,15 @@ public class MainWindow {
     private record UserFormData(String description, String fullName, String login, String ipAddress, String role) {
     }
 
-    private enum SyncStatus {
-        ERROR("Sync error", Color.web("#d93025")),
-        INITIALIZING("Sync initializing", Color.web("#f9ab00")),
-        OK("Sync OK", Color.web("#188038"));
+    private enum QuantisIndicator {
+        CHECKING("Quantis USB: checking", Color.web("#f9ab00")),
+        AVAILABLE("Quantis USB: available", Color.web("#188038")),
+        UNAVAILABLE("Quantis USB: unavailable", Color.web("#d93025"));
 
         private final String label;
         private final Color color;
 
-        SyncStatus(String label, Color color) {
+        QuantisIndicator(String label, Color color) {
             this.label = label;
             this.color = color;
         }
