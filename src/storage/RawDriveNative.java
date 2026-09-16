@@ -21,6 +21,7 @@ interface RawDriveNative extends Library {
     int rd_query_drive(int driveNumber, LongByReference sizeBytes, IntByReference offline,
                        IntByReference mounted, IntByReference systemDisk, IntByReference busType,
                        Pointer model, int modelCapacity);
+    int rd_check_physical_write_access(int driveNumber);
     int rd_write_physical(int driveNumber, long offset, byte[] data, int length);
     int rd_write_image(WString path, long offset, byte[] data, int length);
 }

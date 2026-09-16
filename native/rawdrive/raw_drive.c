@@ -9,6 +9,7 @@
 #include <wchar.h>
 
 #define RD_MAX_WRITE (1024U * 1024U)
+#define RD_MAX_VOLUME_LOCKS 32
 
 /* Present in current Windows SDKs, but missing from some MinGW header sets. */
 #ifndef IOCTL_DISK_GET_DISK_ATTRIBUTES
@@ -121,6 +122,71 @@ static int disk_has_mounted_volume(int disk_number) {
     } while (FindNextVolumeW(search, volume_name, MAX_PATH));
     FindVolumeClose(search);
     return 0;
+}
+
+static void release_volume_locks(HANDLE *handles, int count) {
+    DWORD returned;
+    int index;
+    for (index = count - 1; index >= 0; index--) {
+        DeviceIoControl(handles[index], FSCTL_UNLOCK_VOLUME, NULL, 0, NULL, 0, &returned, NULL);
+        CloseHandle(handles[index]);
+    }
+}
+
+static int lock_disk_volumes(int disk_number, HANDLE *handles, int *count) {
+    wchar_t volume_name[MAX_PATH];
+    wchar_t handle_name[MAX_PATH];
+    HANDLE search = FindFirstVolumeW(volume_name, MAX_PATH);
+    *count = 0;
+    if (search == INVALID_HANDLE_VALUE) return RD_ERROR_VOLUME_LOCK_FAILED;
+    do {
+        BYTE buffer[sizeof(VOLUME_DISK_EXTENTS) + sizeof(DISK_EXTENT) * 32];
+        VOLUME_DISK_EXTENTS *extents = (VOLUME_DISK_EXTENTS *)buffer;
+        DWORD returned = 0;
+        DWORD index;
+        int matches = 0;
+        HANDLE volume;
+        size_t length;
+        wcsncpy(handle_name, volume_name, MAX_PATH - 1);
+        handle_name[MAX_PATH - 1] = L'\0';
+        length = wcslen(handle_name);
+        if (length > 0 && handle_name[length - 1] == L'\\') handle_name[length - 1] = L'\0';
+        volume = CreateFileW(handle_name, 0,
+                             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                             NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (volume == INVALID_HANDLE_VALUE) continue;
+        if (DeviceIoControl(volume, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, NULL, 0,
+                            buffer, sizeof(buffer), &returned, NULL)) {
+            for (index = 0; index < extents->NumberOfDiskExtents; index++) {
+                if ((int)extents->Extents[index].DiskNumber == disk_number) {
+                    matches = 1;
+                    break;
+                }
+            }
+        }
+        CloseHandle(volume);
+        if (!matches) continue;
+        if (*count >= RD_MAX_VOLUME_LOCKS) {
+            FindVolumeClose(search);
+            release_volume_locks(handles, *count);
+            *count = 0;
+            return RD_ERROR_VOLUME_LOCK_FAILED;
+        }
+        volume = CreateFileW(handle_name, GENERIC_READ | GENERIC_WRITE,
+                             FILE_SHARE_READ | FILE_SHARE_WRITE,
+                             NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (volume == INVALID_HANDLE_VALUE ||
+            !DeviceIoControl(volume, FSCTL_LOCK_VOLUME, NULL, 0, NULL, 0, &returned, NULL)) {
+            if (volume != INVALID_HANDLE_VALUE) CloseHandle(volume);
+            FindVolumeClose(search);
+            release_volume_locks(handles, *count);
+            *count = 0;
+            return RD_ERROR_VOLUME_LOCK_FAILED;
+        }
+        handles[(*count)++] = volume;
+    } while (FindNextVolumeW(search, volume_name, MAX_PATH));
+    FindVolumeClose(search);
+    return RD_OK;
 }
 
 static void copy_descriptor_text(wchar_t *destination, int capacity,
@@ -265,19 +331,47 @@ cleanup:
 RD_API int rd_write_physical(int drive_number, uint64_t offset,
                              const unsigned char *data, uint32_t length) {
     HANDLE disk;
+    HANDLE volume_locks[RD_MAX_VOLUME_LOCKS];
     GET_LENGTH_INFORMATION disk_length;
     DWORD returned;
+    int lock_count = 0;
     int result;
     if (drive_number < 0) return RD_ERROR_INVALID_ARGUMENT;
     if (is_system_disk_number(drive_number)) return RD_ERROR_SYSTEM_DISK;
+    result = lock_disk_volumes(drive_number, volume_locks, &lock_count);
+    if (result != RD_OK) return result;
     disk = open_disk(drive_number, GENERIC_READ | GENERIC_WRITE);
-    if (disk == INVALID_HANDLE_VALUE) return win_error();
+    if (disk == INVALID_HANDLE_VALUE) {
+        result = win_error();
+        release_volume_locks(volume_locks, lock_count);
+        return result;
+    }
     if (!DeviceIoControl(disk, IOCTL_DISK_GET_LENGTH_INFO, NULL, 0,
                          &disk_length, sizeof(disk_length), &returned, NULL)) {
-        result = win_error(); CloseHandle(disk); return result;
+        result = win_error();
+        CloseHandle(disk);
+        release_volume_locks(volume_locks, lock_count);
+        return result;
     }
     result = write_physical_bytes(disk, (uint64_t)disk_length.Length.QuadPart, offset, data, length);
     CloseHandle(disk);
+    release_volume_locks(volume_locks, lock_count);
+    return result;
+}
+
+RD_API int rd_check_physical_write_access(int drive_number) {
+    HANDLE volume_locks[RD_MAX_VOLUME_LOCKS];
+    HANDLE disk;
+    int lock_count = 0;
+    int result;
+    if (drive_number < 0) return RD_ERROR_INVALID_ARGUMENT;
+    if (is_system_disk_number(drive_number)) return RD_ERROR_SYSTEM_DISK;
+    result = lock_disk_volumes(drive_number, volume_locks, &lock_count);
+    if (result != RD_OK) return result;
+    disk = open_disk(drive_number, GENERIC_READ | GENERIC_WRITE);
+    if (disk == INVALID_HANDLE_VALUE) result = win_error();
+    else CloseHandle(disk);
+    release_volume_locks(volume_locks, lock_count);
     return result;
 }
 

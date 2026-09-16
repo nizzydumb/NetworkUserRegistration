@@ -16,11 +16,13 @@
 #define RD_ERROR_SYSTEM_DISK -3
 #define RD_ERROR_OUT_OF_BOUNDS -4
 #define RD_ERROR_VERIFY_FAILED -5
+#define RD_ERROR_VOLUME_LOCK_FAILED -6
 
 RD_API int rd_is_elevated(void);
 RD_API int rd_query_drive(int drive_number, uint64_t *size_bytes, int *offline,
                           int *mounted, int *system_disk, int *bus_type,
                           wchar_t *model, int model_capacity);
+RD_API int rd_check_physical_write_access(int drive_number);
 RD_API int rd_write_physical(int drive_number, uint64_t offset,
                              const unsigned char *data, uint32_t length);
 RD_API int rd_write_image(const wchar_t *path, uint64_t offset,

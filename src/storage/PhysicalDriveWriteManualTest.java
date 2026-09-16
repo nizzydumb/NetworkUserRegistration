@@ -55,6 +55,7 @@ public final class PhysicalDriveWriteManualTest {
     private static void usage() {
         System.out.println("No write performed. Explicit destructive-test syntax:");
         System.out.println("  --execute <driveNumber> <offset> <hexBytes> WRITE-PHYSICALDRIVE-<driveNumber>");
-        System.out.println("Example: --execute 2 0x100000 DEADBEEF WRITE-PHYSICALDRIVE-2");
+        System.out.println("No sample offset is provided: derive it from the target device's documented layout.");
+        System.out.println("Warning: 0x100000 is commonly a partition start and must not be used as a generic test offset.");
     }
 }

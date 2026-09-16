@@ -53,6 +53,11 @@ public final class JnaPhysicalDriveService {
         requireSuccess(result, "Writing " + bytes.length + " bytes to PhysicalDrive" + request.driveNumber());
     }
 
+    public void checkPhysicalWriteAccess(int driveNumber) {
+        requireSuccess(RawDriveNative.INSTANCE.rd_check_physical_write_access(driveNumber),
+                "Checking write access to PhysicalDrive" + driveNumber);
+    }
+
     void writeImageForVerification(Path image, long offset, byte[] bytes) {
         int result = RawDriveNative.INSTANCE.rd_write_image(new WString(image.toAbsolutePath().toString()),
                 offset, bytes, bytes.length);
@@ -67,6 +72,7 @@ public final class JnaPhysicalDriveService {
             case -3 -> "the disk contains the running Windows installation";
             case -4 -> "the write exceeds the device boundary";
             case -5 -> "read-back verification did not match";
+            case -6 -> "a volume on the disk could not be locked; close File Explorer and every application using the drive";
             default -> {
                 try { yield Kernel32Util.formatMessage(result).strip(); }
                 catch (RuntimeException ignored) { yield "Windows error " + result; }

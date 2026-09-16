@@ -14,6 +14,8 @@ are exposed through a deliberately explicit manual integration-test class.
 - `storage.PhysicalDriveInfo` is the dropdown model.
 - `storage.RawByteWriterVerification` tests the same DLL against a temporary image file only.
 - `storage.PhysicalDriveInventoryVerification` tests drive discovery without writing.
+- `storage.PhysicalDriveAccessVerification` locks the selected volumes and opens the disk read/write, but never
+  calls `WriteFile`.
 - `storage.PhysicalDriveWriteManualTest` is the opt-in destructive integration test.
 
 JNA does not bypass Windows permissions. Start IntelliJ itself with **Run as administrator**, then run the JavaFX
@@ -48,9 +50,11 @@ Zero means success. Positive values are Windows system error codes. Negative lib
 - `-5`: read-back differs from the requested bytes
 
 The native `rd_write_physical` function repeats all critical checks even if it is called without the JavaFX UI. It
-rejects system disks, online disks, empty writes, writes over 1 MiB, and out-of-bounds ranges. It flushes and reads
-the requested range back before returning success. Because Windows raw-disk I/O is sector based, a byte-addressed
-request uses a read-modify-write of only the surrounding sector(s), preserving their other bytes.
+rejects system disks, empty writes, writes over 1 MiB, and out-of-bounds ranges. Before opening the physical disk for
+write access, it temporarily locks every volume whose extents belong to the selected disk and holds those locks
+until verification completes. It then flushes and reads the requested range back before returning success. Because
+Windows raw-disk I/O is sector based, a byte-addressed request uses a read-modify-write of only the surrounding
+sector(s), preserving their other bytes.
 
 ## Using the dropdown
 
@@ -86,15 +90,30 @@ then exits. It never calls the native write function.
 
 ## Explicit physical-write test
 
+Before any physical write, the zero-byte access preflight can verify administrator access and volume locking:
+
+```text
+--check <driveNumber> CHECK-PHYSICALDRIVE-<driveNumber>
+```
+
+Run those arguments with `storage.PhysicalDriveAccessVerification`. It temporarily locks matching volumes, opens
+the disk with read/write access, closes it, and unlocks the volumes without writing bytes.
+
 Run `storage.PhysicalDriveWriteManualTest` only against a disposable and fully backed-up disk. The implementation
 does not require the disk to be offline, but Windows or the storage driver may still reject raw writes while its
 volumes are mounted. A successful write to a mounted filesystem can corrupt it.
 With no program arguments it prints help and performs no write. An actual invocation requires all five arguments:
 
 ```text
---execute 2 0x100000 DEADBEEF WRITE-PHYSICALDRIVE-2
+--execute <driveNumber> <verifiedByteOffset> <hexBytes> WRITE-PHYSICALDRIVE-<driveNumber>
 ```
+
+There is intentionally no example byte offset. `0x100000` is a common first-partition boundary and using it as a
+generic test address can overwrite a filesystem boot sector. Derive an address only from the documented layout of
+the disposable target device.
 
 The test re-enumerates the explicitly numbered drive and rejects the Windows system disk. The native DLL repeats
 the system-disk check, performs the sector-aware write, flushes it, and verifies the requested bytes by reading them
 back. Online/offline state remains visible in the inventory but is informational rather than an application gate.
+If any program has an open file or directory on the target volume, Windows can refuse the temporary volume lock;
+close File Explorer and all applications using the drive and retry.

@@ -185,7 +185,9 @@ Use the least privileged and least destructive verification first:
 3. Run `storage.RawByteWriterVerification`. It calls `rd_write_image` against a temporary 4096-byte file and never
    opens a physical-drive path.
 4. Run `storage.PhysicalDriveInventoryVerification` to exercise read-only drive discovery.
-5. Use `storage.PhysicalDriveWriteManualTest` only when deliberately testing with a disposable, fully backed-up
+5. Run `storage.PhysicalDriveAccessVerification` with the explicit drive-specific check token to verify volume
+   locking and a read/write disk handle without calling `WriteFile`.
+6. Use `storage.PhysicalDriveWriteManualTest` only when deliberately testing with a disposable, fully backed-up
    disk. With no arguments it performs no write. Online disks are permitted by project policy, although Windows may
    reject them and mounted filesystems can be corrupted.
 
@@ -194,6 +196,10 @@ Never substitute a real disk into an automated test. The manual write test requi
 ```text
 --execute <driveNumber> <offset> <hexBytes> WRITE-PHYSICALDRIVE-<driveNumber>
 ```
+
+Do not use `0x100000` as a generic test address: it is commonly the exact beginning of the first partition. The
+physical-write path locks matching volumes with `FSCTL_LOCK_VOLUME` before opening the disk and retains those locks
+through flush and read-back verification. A lock failure means an application still has the volume open.
 
 ## Troubleshooting
 
