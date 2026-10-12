@@ -118,6 +118,18 @@ Run the committed IntelliJ configuration named **RegistrationApplication**.
 Do not create a configuration by right-clicking a random class: the committed
 configuration supplies the JavaFX module path and native-library options.
 
+The file is located at:
+
+```text
+.idea/runConfigurations/RegistrationApplication.xml
+```
+
+In IntelliJ, use the run-configuration selector at the top right and choose
+**RegistrationApplication**. If it is not listed, open **Run | Edit
+Configurations**, click **+ | Application**, and recreate these settings, or
+close and reopen the repository root so IntelliJ reloads the committed
+`.idea/runConfigurations` directory.
+
 Its required settings are:
 
 ```text
@@ -135,6 +147,23 @@ VM options:
 --enable-native-access=javafx.graphics,ALL-UNNAMED
 -Djava.library.path="$PROJECT_DIR$/lib/quantis"
 ```
+
+If IntelliJ reports that JavaFX runtime components are missing, check the
+following before changing source code:
+
+1. **Project SDK** and **Module SDK** both point to
+   `lib/jdk-26.0.2`, not a system JDK and not the `bin` directory.
+2. The run configuration is **RegistrationApplication**, not a newly created
+   class configuration; the JavaFX `--module-path` must be present in VM
+   options.
+3. These files exist and are real JARs (not Git LFS pointer text files):
+   `lib/javafx-sdk-26.0.2/lib/javafx.base.jar`,
+   `javafx.graphics.jar`, and `javafx.controls.jar`.
+4. Run `git lfs pull`, then `.\setup-dependencies.ps1`, and use **File |
+   Reload All from Disk** followed by **Build | Rebuild Project**.
+
+The JavaFX `src.zip` file is only for source browsing and is not required to
+run the application.
 
 The old forwarding `app.Main` class and duplicate run configuration were
 removed because they created a second apparent entry point without adding any
