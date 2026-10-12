@@ -32,8 +32,12 @@ must first associate the hardware with the supplied signed WinUSB driver.
 Start PowerShell as Administrator in the repository root and run:
 
 ```powershell
-pnputil.exe /add-driver ".\third_party\quantis-20.2.3\driver\QuantisUsb\QuantisUsb.inf" /install
+.\install-quantis-driver.ps1
 ```
+
+The script verifies that the catalog is present, then invokes Windows
+`pnputil`. You can also call `pnputil.exe` directly with the INF path if you
+prefer not to use the helper script.
 
 Alternatively, open Device Manager, right-click **Quantis USB** under
 **Other devices**, choose **Update driver**, then **Browse my computer for
@@ -47,11 +51,27 @@ Enable **Include subfolders**. After installation, reconnect the device if
 necessary. Administrator rights are required only for driver installation,
 not normally for reading random data.
 
-The included catalog has a valid ID Quantique SA signature. The package is a
+The included catalog has an ID Quantique SA signature. The package is a
 legacy 2010 WinUSB driver shipped in the vendor's 20.2.3 release. If current
 Windows security policy rejects it, obtain an updated signed legacy-device
 driver from ID Quantique instead of disabling signature enforcement or Memory
 Integrity.
+
+The driver files are protected from Git line-ending conversion by the
+repository's `.gitattributes`. Do not edit or resave `QuantisUsb.inf`,
+`QuantisUsb.cdf`, or `QuantisUsb.cat` in an editor. To compare a checkout with
+the original vendor directory, use:
+
+```powershell
+Get-FileHash ".\third_party\quantis-20.2.3\driver\QuantisUsb\QuantisUsb.inf" -Algorithm SHA256
+Get-FileHash ".\third_party\quantis-20.2.3\driver\QuantisUsb\QuantisUsb.cat" -Algorithm SHA256
+```
+
+If a previous checkout was made before the binary-preservation rule was added,
+delete only that checkout and clone it again, or run `git lfs pull` and restore
+the current repository files before retrying the installation. If Windows still
+rejects the package, inspect `%WINDIR%\INF\setupapi.dev.log` for the exact
+catalog or policy error; do not replace individual driver files.
 
 ## 2. Verify Windows device state
 

@@ -71,7 +71,7 @@ if (Test-Path -LiteralPath $quantisDirectory) {
     --main-jar NetworkUserRegistration.jar `
     --main-class app.RegistrationApplication `
     --module-path (Join-Path $javaFxRoot "lib") `
-    --add-modules javafx.controls `
+    --add-modules javafx.controls,java.se `
     --java-options '--enable-native-access=javafx.graphics,ALL-UNNAMED' `
     --java-options '-Drawdrive.library.path=$APPDIR\rawdrive.dll' `
     --java-options '-Djava.library.path=$APPDIR'

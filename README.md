@@ -1,75 +1,133 @@
 # Network User Registration
 
-## Requirements
+Windows JavaFX application for network/user registration, Quantis USB entropy,
+NIST SP 800-22 diagnostics, and guarded physical-drive access.
 
-- Windows x64
-- IntelliJ IDEA with Java 26 support
-- Git LFS when cloning from GitHub
-- PowerShell only if using the optional command-line scripts
+## Immediately after cloning
 
-The repository contains both the complete Windows x64 OpenJDK 26.0.2 distribution and the complete extracted
-Windows x64 JavaFX 26.0.2 SDK. No network connection or system Java installation is required to compile and run
-the application. User-specific IntelliJ settings, build output, logs, and redundant download archives are excluded
-from Git. The repository also contains the redistributable Quantis 20.2.3 USB driver, native source, and a project-built
-Windows x64 JNI library.
+Use Git with Git LFS. Do not use GitHub's **Download ZIP** for this project,
+because several required JDK and JavaFX files are stored as Git LFS objects.
 
-## Configure and run directly in IntelliJ IDEA
+For a new clone:
 
-The root `NetworkUserRegistration.iml` is explicitly included in Git. It defines the source root and portable,
-project-relative JavaFX, Bouncy Castle, and JNA libraries. IntelliJ should load those libraries automatically. The JDK is
-still selected manually because IntelliJ stores SDK registrations outside the project.
+```powershell
+git lfs install
+git clone <repository-url>
+cd NetworkUserRegistration
+git lfs pull
+.\setup-dependencies.ps1
+```
 
-### 1. Open the project
+If the repository was already cloned, run these commands in its root:
 
-Clone with Git LFS enabled so the large dependency files are materialized, then open the repository root. If the
-project was delivered as a complete archive, extract it and open the directory containing `src`, `lib`, and
+```powershell
+git lfs install
+git lfs pull
+.\setup-dependencies.ps1
+```
+
+Nothing should be unzipped or moved after a correct Git LFS clone. Open the
+directory that directly contains `src`, `lib`, `README.md`, and
 `NetworkUserRegistration.iml`.
 
-If IntelliJ does not recognize `src`, right-click it and select **Mark Directory As | Sources Root**.
+`setup-dependencies.ps1` is a validator: it does not download or install
+anything. A successful run ends with:
 
-### 2. Install the project-local JDK
+```text
+Dependency check passed: OpenJDK, JavaFX, Bouncy Castle, JNA, and Git LFS files are ready.
+```
 
-1. Open **File | Project Structure | Platform Settings | SDKs**.
-2. Press **+**, select **Add JDK**, and choose `<project>\lib\jdk-26.0.2`.
-3. Select the JDK directory itself—not `bin`, `java.exe`, `javac.exe`, or `lib\modules`.
-4. Give it any clear name, for example `Project OpenJDK 26.0.2`.
-5. Under **Project Settings | Project**, select it as **Project SDK** and set Language level to `26` or `SDK default`.
-6. Under **Project Settings | Modules | Dependencies**, set Module SDK to `Project SDK`.
+If PowerShell refuses to run scripts, use this only in the current terminal:
 
-A JDK is an IntelliJ SDK, not a JAR dependency. IntelliJ stores SDK registrations outside the project, so this one
-selection cannot be safely encoded in `.iml`.
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+```
 
-### 3. Verify the imported JavaFX library
+## IntelliJ IDEA setup
 
-Open **Project Structure | Modules | Dependencies** and confirm that `JavaFX 26.0.2` appears. The module definition
-includes `javafx.base.jar`, `javafx.graphics.jar`, `javafx.controls.jar`, and the SDK source archive. If IntelliJ did
-not load it, reload the project from disk before adding the same files manually.
+Use IntelliJ IDEA with Java 26 support.
 
-Do not add `javafx-swt.jar` unless SWT is installed separately. Add other JavaFX modules only when future source
-code imports them.
+1. Open the repository root with **File | Open**. Do not open `src`, `lib`, or
+   the `.iml` file as a separate project.
+2. Open **File | Project Structure | Platform Settings | SDKs**.
+3. Remove or correct any broken SDK entry named `openjdk-26.0.2` that points to
+   a path on another computer.
+4. Press **+ | Add JDK** and choose:
 
-### 4. Verify the imported Bouncy Castle library
+   ```text
+   <project>\lib\jdk-26.0.2
+   ```
 
-Confirm that `Bouncy Castle 1.84` appears under **Project Structure | Modules | Dependencies**. Its three runtime
-JARs, source archives, and Javadocs are already declared in `.iml`. Source and Javadoc archives are attached for
-navigation but are not placed on the runtime classpath.
+   Select the JDK directory itself, not `bin`, `java.exe`, `javac.exe`,
+   `lib`, or `lib\modules`.
+5. Keep or rename the SDK to exactly `openjdk-26.0.2`, which matches
+   `.idea/misc.xml`.
+6. Under **Project Settings | Project**, select `openjdk-26.0.2` as the Project
+   SDK and use language level **26** or **SDK default**.
+7. Under **Project Settings | Modules | Dependencies**, set Module SDK to
+   **Project SDK**.
+8. Under **Settings | Build, Execution, Deployment | Compiler | Java
+   Compiler**, confirm target bytecode **26**.
+9. Use **File | Reload All from Disk**, then **Build | Rebuild Project**.
 
-### 5. Configure compilation and execution
+The root `NetworkUserRegistration.iml` already declares JavaFX 26.0.2, Bouncy
+Castle 1.84, and JNA 5.19.1 with project-relative paths. Do not manually add
+their JARs unless that module file was not imported.
 
-Under **Settings | Build, Execution, Deployment | Compiler | Java Compiler**, set target bytecode to `26`. Then use
-**Build | Rebuild Project**.
+### If IntelliJ refuses the bundled JDK
 
-The committed `RegistrationApplication` run configuration should appear automatically. If it does not, create an
-**Application** configuration with:
+The bundled directory is a complete and working Windows x64 OpenJDK 26.0.2.
+The following command must succeed:
+
+```powershell
+.\lib\jdk-26.0.2\bin\java.exe -version
+```
+
+Check these causes in order:
+
+1. **Git LFS objects are missing.** Run `git lfs pull`, then
+   `.\setup-dependencies.ps1`. The file `lib\jdk-26.0.2\lib\modules` should be
+   roughly 146 MB, not a small text file beginning with
+   `version https://git-lfs.github.com/spec/v1`.
+2. **The wrong directory was selected.** Add `lib\jdk-26.0.2`, not its `bin`
+   directory or an executable.
+3. **A stale global IntelliJ SDK exists.** Delete the broken
+   `openjdk-26.0.2` entry under Platform Settings | SDKs, add the project copy,
+   then explicitly reselect it for both Project and Module.
+4. **The project was opened at the wrong level.** Reopen the directory
+   containing `NetworkUserRegistration.iml`.
+5. **The IntelliJ build lacks Java 26 support.** Update IntelliJ IDEA, then add
+   the JDK again. IntelliJ's own runtime does not need to be changed.
+6. **Security software blocked extracted executables.** Check Windows Security
+   history and file properties. Do not download individual replacement DLLs or
+   JDK files from third-party sites.
+
+If `java.exe -version` works and `setup-dependencies.ps1` passes, the JDK files
+are valid; the remaining problem is IntelliJ SDK registration or project/module
+selection.
+
+## Application entry point
+
+The single application entry point is:
+
+```text
+app.RegistrationApplication
+```
+
+Run the committed IntelliJ configuration named **RegistrationApplication**.
+Do not create a configuration by right-clicking a random class: the committed
+configuration supplies the JavaFX module path and native-library options.
+
+Its required settings are:
 
 ```text
 Main class: app.RegistrationApplication
 Use classpath of module: NetworkUserRegistration
-JRE: Project SDK
+JRE: Project SDK (openjdk-26.0.2)
 Working directory: $PROJECT_DIR$
 ```
 
-Use these VM options:
+VM options:
 
 ```text
 --module-path "$PROJECT_DIR$/lib/javafx-sdk-26.0.2/lib"
@@ -78,66 +136,61 @@ Use these VM options:
 -Djava.library.path="$PROJECT_DIR$/lib/quantis"
 ```
 
-The IntelliJ JavaFX library makes JavaFX classes available during compilation. The `--module-path` and
-`--add-modules` options make JavaFX available to the JVM during execution. Both configurations are required.
+The old forwarding `app.Main` class and duplicate run configuration were
+removed because they created a second apparent entry point without adding any
+functionality.
 
-If IntelliJ reports `class file has wrong version`, check **Project Structure**, the module SDK, Java compiler target,
-and run-configuration JRE. Class-file version 56 is Java 12, 58 is Java 14, 68 is Java 24, and 70 is Java 26. All
-project compilation and execution settings must use the bundled OpenJDK 26.0.2 SDK rather than an older system JDK.
+## PowerShell commands
 
-### JNA and native C library
-
-Confirm that `JNA 5.19.1` appears under **Project Structure | Modules | Dependencies**. The compiled x64 DLL is at
-`lib/native/rawdrive/rawdrive.dll`; keep the run configuration working directory set to `$PROJECT_DIR$`. To use the
-physical-drive screen, launch IntelliJ as Administrator. Rebuild native C changes with `build-native.ps1`; the
-w64devkit compiler is included in the repository.
-
-## Build and run
+For ordinary command-line execution, run only:
 
 ```powershell
-.\build.ps1
 .\run.ps1
 ```
 
-Both commands use the project-local JDK rather than `PATH`.
+It validates dependencies, compiles the Java sources, and starts
+`app.RegistrationApplication`. You do not need to run `build.ps1` first.
 
-## Build the Windows application image
+| Goal | Command | Calls other scripts automatically? |
+|---|---|---|
+| Validate a fresh clone | `.\setup-dependencies.ps1` | No; performs checks only |
+| Compile Java and copy resources | `.\build.ps1` | Yes; dependency check |
+| Compile and launch the application | `.\run.ps1` | Yes; `build.ps1` |
+| Rebuild raw-drive C DLL | `.\build-native.ps1` | No |
+| Rebuild Quantis JNI DLL | `.\build-quantis.ps1` | No |
+| Build the complete distributable image | `.\build-release.ps1` | Yes; both native builds and Java build |
 
-Create the JAR, private runtime, native libraries, and UAC-enabled Windows launcher with:
+There is no required sequence involving every script. Use the one matching the
+desired outcome. Full descriptions, inputs, outputs, and ordering are in
+[docs/POWERSHELL_SCRIPTS.md](docs/POWERSHELL_SCRIPTS.md).
+
+## Windows application image
+
+Build the application image with:
 
 ```powershell
 .\build-release.ps1
 ```
 
-Run the resulting `dist\NetworkUserRegistration\NetworkUserRegistration.exe`. Distribute the entire
-`dist\NetworkUserRegistration` directory, not the JAR or EXE alone. See `docs\WINDOWS_PACKAGING.md` for the package
-layout, dependency list, UAC behavior, Quantis handling, verification, and troubleshooting instructions.
+Start:
 
-## Quantis
+```text
+dist\NetworkUserRegistration\NetworkUserRegistration.exe
+```
 
-The direct Java JNI declarations and Windows x64 `Quantis.dll` are included. A one-time installation of the signed
-ID Quantique USB driver is still required on every Windows computer. See `docs\QUANTIS_USB_SETUP.md` for driver
-installation, IntelliJ configuration, device verification, rebuilding the DLL, packaging, and troubleshooting.
+Distribute the entire `dist\NetworkUserRegistration` directory, not only its
+JAR or EXE. See [Windows packaging](docs/WINDOWS_PACKAGING.md).
 
-## NIST SP 800-22
+The outer `NetworkUserRegistration.exe` is the user-facing administrator
+launcher and should be started from Explorer or a normal interactive PowerShell
+window. `NetworkUserRegistrationApp.exe` is the internal jpackage launcher;
+keep it in the same directory and do not distribute it separately.
 
-The retained NIST STS 2.1.2 reference source and Java port are described in
-`docs\NIST_SP_800_22_JAVA_PORT.md`.
+## Feature documentation
 
-## Icons
-
-The application/window PNG assets, inline SVG button icons, import examples, accessibility rules, and licensing
-checklist are documented in `docs\ICONS.md`.
-
-## Bouncy Castle
-
-Bouncy Castle Java 1.84 is bundled with provider, utility, and PKIX/CMS artifacts plus matching
-sources, Javadocs, POM metadata, and SHA-256 records. Both IntelliJ and PowerShell builds include it automatically.
-Registration and usage examples are in `docs\BOUNCY_CASTLE.md`.
-
-## Raw physical-drive writes
-
-A guarded Windows C library with direct JNA calls, the read-only JavaFX drive dropdown, and separate inventory,
-disk-image, and opt-in physical-write test classes are documented in `docs\RAW_DRIVE_WRITES.md`.
-The complete C compilation and JNA binding workflow is documented in
-`docs\C_JNA_DEVELOPMENT.md`.
+- [Quantis USB setup](docs/QUANTIS_USB_SETUP.md)
+- [NIST SP 800-22 Java port](docs/NIST_SP_800_22_JAVA_PORT.md)
+- [Raw physical-drive writes](docs/RAW_DRIVE_WRITES.md)
+- [C and JNA development](docs/C_JNA_DEVELOPMENT.md)
+- [Bouncy Castle](docs/BOUNCY_CASTLE.md)
+- [Icons](docs/ICONS.md)
