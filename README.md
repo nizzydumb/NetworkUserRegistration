@@ -186,6 +186,29 @@ launcher and should be started from Explorer or a normal interactive PowerShell
 window. `NetworkUserRegistrationApp.exe` is the internal jpackage launcher;
 keep it in the same directory and do not distribute it separately.
 
+### Build a Windows installer
+
+The installer build uses WiX Toolset 3.x. WiX is a command-line compiler; do
+not start it as a separate application. Install WiX 3.14.x, then add its
+`bin` directory to the current PowerShell session:
+
+```powershell
+$wixBin = "C:\Program Files (x86)\WiX Toolset v3.14\bin"
+$env:Path = "$wixBin;$env:Path"
+Get-Command candle.exe
+Get-Command light.exe
+```
+
+Both commands must resolve to WiX executables. Then build the installer:
+
+```powershell
+.\build-installer.ps1
+```
+
+If WiX was added to the permanent Windows `PATH`, close and reopen
+PowerShell before running the build. WiX 7 exposes `wix.exe` instead of
+`candle.exe` and `light.exe`; the current installer script requires WiX 3.x.
+
 ## Feature documentation
 
 - [Quantis USB setup](docs/QUANTIS_USB_SETUP.md)
