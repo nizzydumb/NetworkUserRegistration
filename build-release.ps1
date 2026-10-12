@@ -22,6 +22,44 @@ function Reset-ProjectDirectory([string]$path, [string]$expectedParent) {
     New-Item -ItemType Directory -Force -Path $resolvedPath | Out-Null
 }
 
+function Remove-ReleaseImage([string]$path, [string]$expectedParent) {
+    $resolvedParent = [IO.Path]::GetFullPath($expectedParent).TrimEnd('\')
+    $resolvedPath = [IO.Path]::GetFullPath($path)
+    if (-not $resolvedPath.StartsWith($resolvedParent + '\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to remove directory outside $resolvedParent`: $resolvedPath"
+    }
+
+    # A previous app-image run can still have Java/launcher processes holding
+    # runtime DLLs open. Stop only this package's known process names before
+    # replacing the image; unrelated applications are not affected.
+    @('NetworkUserRegistrationApp', 'NetworkUserRegistration') |
+        ForEach-Object {
+            Get-Process -Name $_ -ErrorAction SilentlyContinue |
+                ForEach-Object {
+                    Write-Host "Stopping previous $($_.ProcessName) process (PID $($_.Id))..."
+                    Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+                }
+        }
+
+    $remaining = @(Get-Process -Name NetworkUserRegistrationApp,NetworkUserRegistration -ErrorAction SilentlyContinue)
+    if ($remaining.Count -gt 0) {
+        $pids = ($remaining | ForEach-Object { $_.Id }) -join ', '
+        throw "A previous NetworkUserRegistration process is still running (PID $pids). Close the application, or run this script elevated, then retry."
+    }
+
+    $lastError = $null
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        try {
+            Remove-Item -LiteralPath $resolvedPath -Recurse -Force -ErrorAction Stop
+            return
+        } catch {
+            $lastError = $_
+            if ($attempt -lt 3) { Start-Sleep -Seconds 1 }
+        }
+    }
+    throw "Unable to remove the previous release image. Close NetworkUserRegistration and retry. Details: $lastError"
+}
+
 & (Join-Path $projectRoot "build-native.ps1")
 & (Join-Path $projectRoot "build-quantis.ps1")
 & (Join-Path $projectRoot "build.ps1")
@@ -33,7 +71,7 @@ if (Test-Path -LiteralPath $image) {
     if (-not $resolvedImage.StartsWith($resolvedDist + '\', [StringComparison]::OrdinalIgnoreCase)) {
         throw "Refusing to replace application image outside $resolvedDist"
     }
-    Remove-Item -LiteralPath $resolvedImage -Recurse -Force
+    Remove-ReleaseImage $resolvedImage $resolvedDist
 }
 
 $runtimeJars = @(
