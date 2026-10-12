@@ -183,8 +183,9 @@ JAR or EXE. See [Windows packaging](docs/WINDOWS_PACKAGING.md).
 
 The outer `NetworkUserRegistration.exe` is the user-facing administrator
 launcher and should be started from Explorer or a normal interactive PowerShell
-window. `NetworkUserRegistrationApp.exe` is the internal jpackage launcher;
-keep it in the same directory and do not distribute it separately.
+window. `NetworkUserRegistrationJava.exe` is the internal jpackage launcher;
+keep it in the same directory and do not distribute it separately. Installer
+shortcuts target the outer administrator-aware launcher.
 
 ### Build a Windows installer
 

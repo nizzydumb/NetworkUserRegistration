@@ -32,7 +32,7 @@ function Remove-ReleaseImage([string]$path, [string]$expectedParent) {
     # A previous app-image run can still have Java/launcher processes holding
     # runtime DLLs open. Stop only this package's known process names before
     # replacing the image; unrelated applications are not affected.
-    @('NetworkUserRegistrationApp', 'NetworkUserRegistration') |
+    @('NetworkUserRegistrationApp', 'NetworkUserRegistrationJava', 'NetworkUserRegistration') |
         ForEach-Object {
             Get-Process -Name $_ -ErrorAction SilentlyContinue |
                 ForEach-Object {
@@ -41,7 +41,7 @@ function Remove-ReleaseImage([string]$path, [string]$expectedParent) {
                 }
         }
 
-    $remaining = @(Get-Process -Name NetworkUserRegistrationApp,NetworkUserRegistration -ErrorAction SilentlyContinue)
+    $remaining = @(Get-Process -Name NetworkUserRegistrationApp,NetworkUserRegistrationJava,NetworkUserRegistration -ErrorAction SilentlyContinue)
     if ($remaining.Count -gt 0) {
         $pids = ($remaining | ForEach-Object { $_.Id }) -join ', '
         throw "A previous NetworkUserRegistration process is still running (PID $pids). Close the application, or run this script elevated, then retry."
@@ -116,6 +116,13 @@ if (Test-Path -LiteralPath $quantisDirectory) {
 if ($LASTEXITCODE -ne 0) { throw "jpackage failed with exit code $LASTEXITCODE" }
 
 Move-Item -LiteralPath (Join-Path $dist "NetworkUserRegistrationApp") -Destination $image
+# Keep the Java launcher private and reserve the image's primary launcher name
+# for the administrator-aware wrapper below. This also makes jpackage-created
+# installer shortcuts target the UAC-aware executable.
+Rename-Item -LiteralPath (Join-Path $image "NetworkUserRegistrationApp.exe") `
+    -NewName "NetworkUserRegistrationJava.exe"
+Rename-Item -LiteralPath (Join-Path $image "app\NetworkUserRegistrationApp.cfg") `
+    -NewName "NetworkUserRegistrationJava.cfg"
 $quantisRoot = Join-Path $projectRoot "third_party\quantis-20.2.3"
 $quantisDriverDestination = Join-Path $image "drivers\QuantisUsb"
 New-Item -ItemType Directory -Force -Path $quantisDriverDestination | Out-Null

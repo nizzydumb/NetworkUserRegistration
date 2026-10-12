@@ -23,7 +23,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command_line, 
     separator = wcsrchr(launcher_path, L'\\');
     if (separator == NULL) return 1;
     *separator = L'\0';
-    if (_snwprintf(application_path, MAX_PATH, L"%ls\\NetworkUserRegistrationApp.exe",
+    if (_snwprintf(application_path, MAX_PATH, L"%ls\\NetworkUserRegistrationJava.exe",
                    launcher_path) < 0) return 1;
 
     SetCurrentDirectoryW(launcher_path);
