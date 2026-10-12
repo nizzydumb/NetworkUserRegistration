@@ -187,11 +187,32 @@ window. `NetworkUserRegistrationJava.exe` is the internal jpackage launcher;
 keep it in the same directory and do not distribute it separately. Installer
 shortcuts target the outer administrator-aware launcher.
 
+### Renaming the application and changing its icon
+
+The packaging name is repeated intentionally in `build-release.ps1`,
+`build-installer.ps1`, `packaging/windows/elevated-launcher.c`, and the
+documentation. To rename the distributed application, update the jpackage
+`--name` values, the `dist` image directory, the launcher executable names,
+and the target filename in `elevated-launcher.c`. Rebuild both the release
+image and installer; do not rename files inside an already-built image.
+
+The Windows executable icon is generated from the project-owned PNG set in
+`src/assets/app-icon-*.png` and stored as
+`packaging/windows/app-icon.ico`. Replace those PNGs and regenerate the ICO
+before building, or replace the ICO directly if you have a multi-resolution
+Windows icon. `build-release.ps1` passes the ICO to `jpackage`, and the
+administrator launcher embeds the same ICO through
+`packaging/windows/elevated-launcher.rc`.
+
 ### Build a Windows installer
 
 The installer build uses WiX Toolset 3.x. WiX is a command-line compiler; do
 not start it as a separate application. Install WiX 3.14.x, then add its
 `bin` directory to the current PowerShell session:
+
+The official WiX 3.14.1 installer is also retained at
+`third_party/wix/wix314.exe` for machines that cannot download it. Because it
+is a Git LFS file, run `git lfs pull` after cloning before opening it.
 
 ```powershell
 $wixBin = "C:\Program Files (x86)\WiX Toolset v3.14\bin"

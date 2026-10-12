@@ -6,3 +6,4 @@ lib/jdk-26.0.2/lib/src.zip filter=lfs diff=lfs merge=lfs -text
 # INF/CDF text line endings during checkout; changing them can invalidate the
 # catalog signature even though the files still appear readable.
 third_party/quantis-20.2.3/driver/** -text
+third_party/wix/wix314.exe filter=lfs diff=lfs merge=lfs -text

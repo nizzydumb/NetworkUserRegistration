@@ -23,6 +23,11 @@ app-icon-256.png
 JavaFX receives all available sizes and lets Windows select the most appropriate one for the title bar, taskbar,
 and window switcher. The loading code is in `MainWindow.setWindowIcon` and `AuthWindow.WindowIcons.apply`.
 
+The packaged Windows executables use `packaging/windows/app-icon.ico`. It contains the same project-owned artwork in
+multiple resolutions. `build-release.ps1` supplies it to `jpackage`, while `elevated-launcher.rc` embeds it into the
+administrator-aware launcher. Update the PNG source set, regenerate the ICO, and rebuild the release image to change
+the Explorer, Start Menu, and installer icon.
+
 ### Edit and delete button icons
 
 The edit and delete symbols are small, hand-coded `SVGPath` shapes in `MainWindow.createEditIconButton` and

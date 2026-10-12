@@ -9,6 +9,7 @@ $staging = Join-Path $projectRoot "out\package-input"
 $dist = Join-Path $projectRoot "dist"
 $image = Join-Path $dist "NetworkUserRegistration"
 $manifest = Join-Path $staging "MANIFEST.MF"
+$applicationIcon = Join-Path $projectRoot "packaging\windows\app-icon.ico"
 
 function Reset-ProjectDirectory([string]$path, [string]$expectedParent) {
     $resolvedParent = [IO.Path]::GetFullPath($expectedParent).TrimEnd('\')
@@ -108,6 +109,7 @@ if (Test-Path -LiteralPath $quantisDirectory) {
     --input $staging `
     --main-jar NetworkUserRegistration.jar `
     --main-class app.RegistrationApplication `
+    --icon $applicationIcon `
     --module-path (Join-Path $javaFxRoot "lib") `
     --add-modules javafx.controls,java.se `
     --java-options '--enable-native-access=javafx.graphics,ALL-UNNAMED' `
