@@ -135,8 +135,17 @@ Before distributing a build:
 The application name and image directory are configured in `build-release.ps1`. If the internal jpackage launcher
 name changes, update `elevated-launcher.c` to match it. Rebuild after changing the UAC manifest or launcher source.
 
-An installer can be added later, but the application image intentionally avoids an additional installer-toolchain
-dependency. It is already self-contained and portable as a directory or ZIP archive.
+To wrap the image in a Windows installer, install WiX Toolset 3.x and add the directory containing
+`candle.exe` and `light.exe` to `PATH`. Then run:
+
+```powershell
+.\setup-dependencies.ps1
+.\build-installer.ps1
+```
+
+The installer is written to `dist\installer\NetworkUserRegistration-1.0.0.exe`. It installs per-user by default
+and creates Start Menu and desktop shortcuts. The installer contains the complete bundled Java runtime and
+application image; users do not need Java, JavaFX, JNA, or Bouncy Castle installed separately.
 
 ## Common problems
 
