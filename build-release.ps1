@@ -145,5 +145,14 @@ if ($LASTEXITCODE -ne 0) { throw "Launcher resource compilation failed with exit
     -o (Join-Path $image "NetworkUserRegistration.exe") -lshell32
 if ($LASTEXITCODE -ne 0) { throw "Elevated launcher compilation failed with exit code $LASTEXITCODE" }
 
+# jpackage's WiX bundle expects the generated launcher filename to remain in
+# the app image. Keep an elevated wrapper under that compatibility name so
+# installer shortcuts launch UAC-aware code, while the wrapper itself starts
+# NetworkUserRegistrationJava.exe.
+Copy-Item -LiteralPath (Join-Path $image "NetworkUserRegistration.exe") `
+    -Destination (Join-Path $image "NetworkUserRegistrationApp.exe") -Force
+Copy-Item -LiteralPath (Join-Path $image "app\NetworkUserRegistrationJava.cfg") `
+    -Destination (Join-Path $image "app\NetworkUserRegistrationApp.cfg") -Force
+
 Write-Host "Release image created at $image"
 Write-Host "Start it with dist\NetworkUserRegistration\NetworkUserRegistration.exe"

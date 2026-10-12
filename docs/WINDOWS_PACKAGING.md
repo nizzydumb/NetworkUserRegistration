@@ -31,6 +31,7 @@ dist/
 └── NetworkUserRegistration/
     ├── NetworkUserRegistration.exe       elevated user-facing launcher
     ├── NetworkUserRegistrationJava.exe   internal jpackage Java launcher
+    ├── NetworkUserRegistrationApp.exe    elevated wrapper for installer shortcuts
     ├── app/                               JARs and native DLLs
     └── runtime/                           private Java/JavaFX runtime
 ```
@@ -43,6 +44,8 @@ Start the packaged application with:
 
 Windows displays a User Account Control prompt before starting the Java application. The internal
 `NetworkUserRegistrationJava.exe` should normally not be launched directly because it does not request elevation.
+`NetworkUserRegistrationApp.exe` is retained as a compatibility-named elevated wrapper because jpackage's WiX
+bundle expects the generated launcher filename.
 
 ## Why the JAR is not enough
 
